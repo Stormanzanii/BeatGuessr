@@ -76,6 +76,10 @@ try {
   await page.locator("#guess").press("Enter");
   assert.equal(await page.evaluate(() => beatguessr.state.stats.solved), 1);
   assert.equal(await page.locator("#reveal").isVisible(), true);
+  assert.equal(
+    await page.locator("#reveal-source").textContent(),
+    "Source: Built-in songs",
+  );
   await page.waitForFunction(() => beatguessr.player.playing);
   const reward = await page.evaluate(() => beatguessr.player.lastSchedule);
   assert.equal(reward.seconds, Math.min(30, initial.duration));
@@ -160,6 +164,14 @@ try {
   const firstPlaylistId = await page.evaluate(
     () => beatguessr.state.selectedSources[0],
   );
+  await page
+    .locator("#guess")
+    .fill(await page.evaluate(() => beatguessr.state.track.title));
+  await page.locator("#guess").press("Enter");
+  assert.equal(
+    await page.locator("#reveal-source").textContent(),
+    "Source: Browser test",
+  );
   await page.locator("#import-button").click();
   await page.locator("#csv-file").setInputFiles({
     name: "Browser test second.csv",
@@ -180,6 +192,33 @@ try {
     await page.evaluate(() => beatguessr.state.pool.length),
     3,
     "Two overlapping playlists should combine to three unique songs",
+  );
+  assert.deepEqual(
+    await page.evaluate(() =>
+      beatguessr.state.pool
+        .find((t) => t.title === "Get Lucky")
+        .poolSources.map((s) => s.name),
+    ),
+    ["Browser test", "Browser test second"],
+  );
+  await page.evaluate(() => {
+    beatguessr.state.played = beatguessr.state.pool
+      .filter((t) => t.title !== "Get Lucky")
+      .map((t) => t.id);
+  });
+  await page.locator("#reroll").click();
+  await page.waitForFunction(
+    () =>
+      !beatguessr.state.loading &&
+      beatguessr.state.track?.title === "Get Lucky",
+    null,
+    { timeout: 120000 },
+  );
+  await page.locator("#guess").fill("Get Lucky");
+  await page.locator("#guess").press("Enter");
+  assert.equal(
+    await page.locator("#reveal-source").textContent(),
+    "Sources: Browser test · Browser test second",
   );
   await page.locator("#source-button").click();
   assert.equal(await page.locator("#source-dropdown input:checked").count(), 2);
@@ -268,6 +307,10 @@ try {
     "Short audio uses the full available snippet",
   );
   assert.equal(
+    await page.locator("#reveal-source").textContent(),
+    "Source: Local audio",
+  );
+  assert.equal(
     await page.evaluate(() => beatguessr.player.lastSchedule.offset),
     0,
   );
@@ -309,6 +352,95 @@ try {
   );
   console.log(
     "Correct guesses autoplay up to 30 seconds; replay, short files, random starts, and next-song cancellation passed.",
+  );
+
+  await page.route("**/api/search?*", async (route) => {
+    const query = new URL(route.request().url()).searchParams.get("q");
+    if (query === "delay")
+      await new Promise((resolve) => setTimeout(resolve, 450));
+    if (query === "unavailable")
+      return route.fulfill({ status: 503, json: { error: "Unavailable" } });
+    return route.fulfill({
+      json: {
+        tracks:
+          query === "fixture"
+            ? [
+                {
+                  id: "external:fixture",
+                  title: "Fixture Song",
+                  artist: "Fixture Artist",
+                },
+              ]
+            : [
+                {
+                  id: "external:outside",
+                  title: "Outside Song",
+                  artist: "Other Artist",
+                },
+              ],
+      },
+    });
+  });
+  await page.locator(".settings > summary").click();
+  await page.locator("#confetti-amount").fill("1");
+  await page.locator("#guess").fill("outside");
+  await page.locator("#suggestions [role=option]").waitFor();
+  assert.equal(
+    await page.locator("#suggestions strong").textContent(),
+    "Outside Song",
+  );
+  assert.equal(
+    await page.evaluate(() =>
+      beatguessr.state.pool.some((t) => t.title === "Outside Song"),
+    ),
+    false,
+  );
+  await page.locator("#guess").press("ArrowDown");
+  await page.locator("#guess").press("Enter");
+  assert.equal(await page.evaluate(() => beatguessr.state.stage), 1);
+  await page.locator("#guess").fill("delay");
+  await page.waitForRequest(
+    (request) => new URL(request.url()).searchParams.get("q") === "delay",
+  );
+  await page.locator("#guess").press("Escape");
+  await page.waitForTimeout(600);
+  assert.equal(
+    await page.locator("#suggestions").isVisible(),
+    false,
+    "Escape cancels delayed suggestions",
+  );
+  await page.locator("#guess").fill("unavailable");
+  await page
+    .locator(".suggestion-status")
+    .filter({ hasText: "Search is unavailable" })
+    .waitFor();
+  assert.equal(await page.locator("#guess").isEnabled(), true);
+  await page.locator("#guess").fill("Fixture Song");
+  assert.equal(
+    await page.locator("#suggestions strong").first().textContent(),
+    "Fixture Song",
+    "An exact playlist title is immediately selectable",
+  );
+  await page.locator("#guess").fill("fixture");
+  await page.locator("#suggestions [role=option]").waitFor();
+  await page.locator("#guess").press("ArrowDown");
+  await page.locator("#guess").press("Enter");
+  assert.equal(
+    await page.evaluate(() => beatguessr.state.won),
+    true,
+    "A correct external result works across provider IDs",
+  );
+  assert.equal(
+    await page.locator("canvas.confetti").getAttribute("data-duration"),
+    "2",
+  );
+  await page
+    .locator("canvas.confetti")
+    .waitFor({ state: "detached", timeout: 4000 });
+  await page.reload();
+  assert.equal(await page.locator("#confetti-amount").inputValue(), "1");
+  console.log(
+    "Wider search, keyboard guesses, stale-response cancellation, provider errors, and two-second 1x confetti passed.",
   );
 
   await page.setViewportSize({ width: 390, height: 844 });

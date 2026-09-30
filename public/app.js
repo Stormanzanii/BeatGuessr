@@ -1,5 +1,6 @@
 import { ClipPlayer, CLIP_LENGTHS } from "./audio.js";
 import { celebrate, confettiMultiplier } from "./confetti.js";
+import { mergeSuggestions } from "./guess-search.js";
 
 const $ = (id) => document.getElementById(id);
 const year = new Date().getFullYear();
@@ -146,8 +147,7 @@ function showReveal(won) {
   state.done = true;
   state.won = won;
   player.stop();
-  $("suggestions").hidden = true;
-  $("guess").setAttribute("aria-expanded", "false");
+  clearSuggestions();
   const song = state.track,
     seconds = CLIP_LENGTHS[state.stage];
   if (won) {
@@ -167,6 +167,11 @@ function showReveal(won) {
   $("reveal-title").textContent = song.title;
   $("reveal-artist").textContent =
     `${song.artist}${song.year ? ` · ${song.year}` : ""}`;
+  const sources = song.poolSources || [];
+  $("reveal-source").textContent = sources.length
+    ? `${sources.length > 1 ? "Sources" : "Source"}: ${sources.map((source) => source.name).join(" · ")}`
+    : "";
+  $("reveal-source").hidden = !sources.length;
   $("reveal-cover").hidden = !song.cover;
   if (song.cover) $("reveal-cover").src = song.cover;
   $("reveal-links").replaceChildren();
@@ -205,8 +210,7 @@ async function newRound() {
   $("reveal").hidden = true;
   $("guess-history").replaceChildren();
   $("guess").value = "";
-  $("suggestions").hidden = true;
-  $("guess").setAttribute("aria-expanded", "false");
+  clearSuggestions();
   $("record-scene").classList.remove("revealed");
   $("listen-caption").textContent = "How little do you need to hear?";
   setStage(0);
@@ -251,7 +255,7 @@ async function newRound() {
       }
       if (request !== state.request) return;
       player.setBuffer(buffer, $("random-start").checked);
-      state.track = track;
+      state.track = { ...track, poolSources: seed.poolSources || [] };
       state.round++;
       state.played = [
         seed.id,
@@ -404,14 +408,22 @@ async function applyFilters() {
               : t.year >= from && t.year <= to),
         )
       : [];
-    state.pool = [
-      ...new Map(
-        [...data.tracks, ...local].map((t) => [
-          `${cleanTitle(t.title)}|${cleanTitle(t.artist)}`,
-          t,
-        ]),
-      ).values(),
-    ];
+    const combined = new Map();
+    for (const song of [...data.tracks, ...local]) {
+      const key = `${cleanTitle(song.title)}|${cleanTitle(song.artist)}`;
+      const previous = combined.get(key);
+      combined.set(key, {
+        ...song,
+        poolSources: [
+          ...new Map(
+            [...(previous?.poolSources || []), ...(song.poolSources || [])].map(
+              (source) => [source.id, source],
+            ),
+          ).values(),
+        ],
+      });
+    }
+    state.pool = [...combined.values()];
     populateGenres(
       [
         ...new Set([
@@ -423,6 +435,16 @@ async function applyFilters() {
     );
     $("source-detail").textContent =
       `${state.selectedSources.length} source${state.selectedSources.length === 1 ? "" : "s"} combined. Duplicate songs count once.${data.duplicatesRemoved ? ` ${data.duplicatesRemoved} duplicates removed.` : ""}`;
+    if (
+      state.playlists.some(
+        (playlist) =>
+          state.selectedSources.includes(playlist.id) &&
+          playlist.possiblyTruncated,
+      )
+    ) {
+      $("source-detail").textContent +=
+        " A Spotify import may contain only its first 100 songs. Import a full CSV to include the rest.";
+    }
     if (token !== state.request) return;
     $("pool-count").textContent = `${state.pool.length} songs in rotation`;
     if ($("collection-summary"))
@@ -478,8 +500,14 @@ function submitGuess(title, candidate) {
   const correct = candidate
     ? candidate.id === state.track.seedId ||
       candidate.id === state.track.id ||
-      (cleanTitle(candidate.title) === target &&
-        cleanTitle(candidate.artist) === cleanTitle(state.track.artist))
+      ([target, cleanTitle(state.track.matchedTitle || "")].includes(
+        cleanTitle(candidate.title),
+      ) &&
+        [state.track.artist, state.track.matchedArtist]
+          .filter(Boolean)
+          .some(
+            (artist) => cleanTitle(candidate.artist) === cleanTitle(artist),
+          ))
     : [
         target,
         cleanTitle(state.track.matchedTitle || ""),
@@ -487,8 +515,7 @@ function submitGuess(title, candidate) {
       ]
         .filter(Boolean)
         .includes(guess);
-  $("suggestions").hidden = true;
-  $("guess").setAttribute("aria-expanded", "false");
+  clearSuggestions();
   $("guess").value = "";
   if (correct) return showReveal(true);
   state.wrong.push(title);
@@ -521,16 +548,68 @@ function advance() {
   if ($("auto-play").checked) void play();
 }
 let suggestions = [];
-function renderSuggestions() {
-  const query = $("guess").value.trim().toLowerCase();
+let suggestionRequest = 0,
+  suggestionTimer,
+  suggestionController;
+function clearSuggestions() {
+  suggestionRequest++;
+  clearTimeout(suggestionTimer);
+  suggestionController?.abort();
+  suggestions = [];
   state.suggestionIndex = -1;
   $("suggestions").replaceChildren();
-  suggestions =
-    query.length < 2
-      ? []
-      : state.pool
-          .filter((t) => `${t.title} ${t.artist}`.toLowerCase().includes(query))
-          .slice(0, 7);
+  $("suggestions").hidden = true;
+  $("guess").setAttribute("aria-expanded", "false");
+  $("guess").removeAttribute("aria-activedescendant");
+}
+function suggestionStatus(text) {
+  const status = document.createElement("div");
+  status.className = "suggestion-status";
+  status.setAttribute("role", "status");
+  status.textContent = text;
+  $("suggestions").replaceChildren(status);
+  $("suggestions").hidden = false;
+  $("guess").setAttribute("aria-expanded", "true");
+}
+function searchSuggestions() {
+  clearSuggestions();
+  const query = $("guess").value.trim();
+  if (!query || state.loading || state.done) return;
+  const exact = state.pool.filter(
+    (song) => cleanTitle(query) && cleanTitle(song.title) === cleanTitle(query),
+  );
+  if (exact.length) {
+    suggestions = mergeSuggestions(exact, [], query);
+    renderSuggestions();
+  }
+  if (query.length < 2) return;
+  const request = suggestionRequest;
+  suggestionTimer = setTimeout(async () => {
+    if (!suggestions.length) suggestionStatus("Searching songs…");
+    suggestionController = new AbortController();
+    try {
+      const data = await api(
+        `/api/search?${new URLSearchParams({ q: query.slice(0, 120) })}`,
+        { signal: suggestionController.signal },
+      );
+      if (request !== suggestionRequest || state.done || state.loading) return;
+      suggestions = mergeSuggestions(state.pool, data.tracks, query);
+      if (!suggestions.length)
+        return suggestionStatus(
+          "No matches. You can still type a title and press Enter.",
+        );
+      renderSuggestions();
+    } catch (error) {
+      if (request !== suggestionRequest || error.name === "AbortError") return;
+      suggestions = mergeSuggestions(state.pool, [], query);
+      if (suggestions.length) return renderSuggestions();
+      suggestionStatus("Search is unavailable. Type a title and press Enter.");
+    }
+  }, 220);
+}
+function renderSuggestions() {
+  state.suggestionIndex = -1;
+  $("suggestions").replaceChildren();
   $("suggestions").hidden = !suggestions.length;
   $("guess").setAttribute("aria-expanded", String(!!suggestions.length));
   $("guess").removeAttribute("aria-activedescendant");
@@ -549,7 +628,7 @@ function renderSuggestions() {
     $("suggestions").append(button);
   });
 }
-$("guess").addEventListener("input", renderSuggestions);
+$("guess").addEventListener("input", searchSuggestions);
 $("guess").addEventListener("keydown", (event) => {
   if (["ArrowDown", "ArrowUp"].includes(event.key) && suggestions.length) {
     event.preventDefault();
@@ -567,8 +646,7 @@ $("guess").addEventListener("keydown", (event) => {
     );
   }
   if (event.key === "Escape") {
-    $("suggestions").hidden = true;
-    $("guess").setAttribute("aria-expanded", "false");
+    clearSuggestions();
   }
 });
 $("guess-form").addEventListener("submit", (event) => {
@@ -715,6 +793,7 @@ $("local-files").addEventListener("change", async () => {
       year: null,
       genre: "Unknown",
       origin: "local",
+      poolSources: [{ id: "local", name: "Local audio" }],
       file,
     });
   }

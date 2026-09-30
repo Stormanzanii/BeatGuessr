@@ -281,8 +281,19 @@ export function mergeSongs(...collections) {
         duplicate.genre = song.genre;
       duplicate.spotifyUrl ||= song.spotifyUrl;
       duplicate.deezerId ||= song.deezerId;
+      if (duplicate.poolSources || song.poolSources) {
+        duplicate.poolSources = [
+          ...new Map(
+            [...(duplicate.poolSources || []), ...(song.poolSources || [])].map(
+              (source) => [source.id, { ...source }],
+            ),
+          ).values(),
+        ];
+      }
     } else {
       const copy = { ...song };
+      if (song.poolSources)
+        copy.poolSources = song.poolSources.map((source) => ({ ...source }));
       output.push(copy);
       candidates.push(copy);
       byTitle.set(title, candidates);

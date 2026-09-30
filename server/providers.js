@@ -44,21 +44,58 @@ const appleSong = (t) => ({
   genre: t.primaryGenreName,
 });
 
-async function searchDeezer(query) {
+async function searchDeezer(query, requirePreview = true) {
   const data = await getJSON(
     `https://api.deezer.com/search?${new URLSearchParams({ q: query, limit: "15" })}`,
   );
   return (data.data || [])
     .map(deezerSong)
-    .filter((t) => t.previewUrl && t.title && t.artist);
+    .filter((t) => (!requirePreview || t.previewUrl) && t.title && t.artist);
 }
-async function searchApple(query) {
+async function searchApple(query, requirePreview = true) {
   const data = await getJSON(
     `https://itunes.apple.com/search?${new URLSearchParams({ term: query, entity: "song", limit: "15", country: "US" })}`,
   );
   return (data.results || [])
     .map(appleSong)
-    .filter((t) => t.previewUrl && t.title && t.artist);
+    .filter((t) => (!requirePreview || t.previewUrl) && t.title && t.artist);
+}
+
+const searchCache = new Map();
+const searchTasks = new Map();
+export async function searchSongs(query) {
+  const key = query.trim().toLowerCase();
+  if (key.length < 2) return [];
+  const cached = searchCache.get(key);
+  if (cached && Date.now() - cached.at < 5 * 60 * 1000) return cached.songs;
+  if (searchTasks.has(key)) return searchTasks.get(key);
+  const task = (async () => {
+    let results = [],
+      lastError,
+      succeeded = false;
+    for (const search of [searchDeezer, searchApple]) {
+      try {
+        results = await search(query, false);
+        succeeded = true;
+        if (results.length) break;
+      } catch (error) {
+        lastError = error;
+      }
+    }
+    if (!succeeded) throw lastError;
+    const unique = new Map();
+    for (const { id, title, artist } of results) {
+      const identity = `${title.toLowerCase()}|${artist.toLowerCase()}`;
+      if (!unique.has(identity)) unique.set(identity, { id, title, artist });
+    }
+    const songs = [...unique.values()].slice(0, 8);
+    searchCache.set(key, { songs, at: Date.now() });
+    while (searchCache.size > 150)
+      searchCache.delete(searchCache.keys().next().value);
+    return songs;
+  })().finally(() => searchTasks.delete(key));
+  searchTasks.set(key, task);
+  return task;
 }
 
 export async function resolveSong(seed, failedSource) {

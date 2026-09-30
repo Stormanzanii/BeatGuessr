@@ -765,6 +765,16 @@ dialog {
 .confetti-setting {
   margin: 24px 0 8px;
 }
+#reveal-source {
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+.suggestion-status {
+  padding: 12px 9px;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--muted);
+}
 .confetti-setting .volume-label {
   margin-bottom: 12px;
 }

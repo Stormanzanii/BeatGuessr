@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { catalog, filterCatalog, mergeSongs } from "../server/catalog.js";
 import { matchScore } from "../server/matching.js";
-import { allowedAudioURL } from "../server/providers.js";
+import { allowedAudioURL, searchSongs } from "../server/providers.js";
 import {
   parseCSV,
   parseSpotifyEmbed,
@@ -73,6 +73,84 @@ test("non-Latin song names are distinct during deduplication and matching", () =
   assert.equal(mergeSongs([first, second]).length, 2);
   assert.equal(matchScore(first, second), 0);
   assert.equal(matchScore(first, first), 1);
+});
+
+test("pooled songs retain every source without mutating source playlists", () => {
+  const first = {
+    id: "one",
+    title: "Get Lucky",
+    artist: "Daft Punk",
+    poolSources: [{ id: "a", name: "Party" }],
+  };
+  const second = {
+    id: "two",
+    title: "Get Lucky",
+    artist: "Daft Punk",
+    poolSources: [{ id: "b", name: "Driving" }],
+  };
+  const pool = mergeSongs([first], [second], [first]);
+  assert.equal(pool.length, 1);
+  assert.deepEqual(pool[0].poolSources, [
+    { id: "a", name: "Party" },
+    { id: "b", name: "Driving" },
+  ]);
+  assert.deepEqual(first.poolSources, [{ id: "a", name: "Party" }]);
+  pool[0].poolSources[0].name = "Changed";
+  assert.equal(first.poolSources[0].name, "Party");
+});
+
+test("suggestions search the provider catalog, include songs without previews, and cache results", async (t) => {
+  let calls = 0;
+  t.mock.method(globalThis, "fetch", async (url) => {
+    calls++;
+    assert.equal(new URL(url).hostname, "api.deezer.com");
+    return Response.json({
+      data: [
+        {
+          id: 123,
+          title: "Outside the game pool",
+          artist: { name: "Another Artist" },
+          preview: "",
+        },
+        {
+          id: 124,
+          title: "Outside the game pool",
+          artist: { name: "Another Artist" },
+          preview: "",
+        },
+      ],
+    });
+  });
+  const results = await searchSongs("wide catalog test");
+  assert.deepEqual(results, [
+    {
+      id: "deezer:123",
+      title: "Outside the game pool",
+      artist: "Another Artist",
+    },
+  ]);
+  assert.deepEqual(await searchSongs("WIDE CATALOG TEST"), results);
+  assert.equal(calls, 1);
+  assert.deepEqual(await searchSongs("x"), []);
+});
+
+test("suggestion search falls back to Apple Music when Deezer is unavailable", async (t) => {
+  t.mock.method(globalThis, "fetch", async (url) => {
+    if (new URL(url).hostname === "api.deezer.com")
+      return new Response("Unavailable", { status: 503 });
+    return Response.json({
+      results: [
+        {
+          trackId: 321,
+          trackName: "Fallback song",
+          artistName: "Fallback Artist",
+        },
+      ],
+    });
+  });
+  assert.deepEqual(await searchSongs("fallback catalog test"), [
+    { id: "apple:321", title: "Fallback song", artist: "Fallback Artist" },
+  ]);
 });
 test("resolver matches artist and title, rejecting unrelated songs and karaoke", () => {
   const seed = { title: "Get Lucky", artist: "Daft Punk" };

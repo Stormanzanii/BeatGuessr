@@ -4,7 +4,7 @@ import { resolve, extname, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { genres, filterCatalog, mergeSongs } from "./catalog.js";
 import { allSongs, expandLibrary, libraryStatus } from "./library.js";
-import { resolveSong, media, fetchAudio } from "./providers.js";
+import { resolveSong, media, fetchAudio, searchSongs } from "./providers.js";
 import { spotifyPlaylistId, parseSpotifyEmbed, parseCSV } from "./playlists.js";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -93,6 +93,14 @@ export const server = createServer(async (req, res) => {
       return json(res, 403, { error: "Only the local app can make changes." });
     }
     res.setHeader("X-Content-Type-Options", "nosniff");
+    if (req.method === "GET" && url.pathname === "/api/search") {
+      const query = (url.searchParams.get("q") || "").trim();
+      if (query.length > 120)
+        return json(res, 400, {
+          error: "Search must be 120 characters or fewer.",
+        });
+      return json(res, 200, { tracks: await searchSongs(query) });
+    }
     if (req.method === "GET" && url.pathname === "/api/health")
       return json(res, 200, { ok: true, songs: allSongs().length });
     if (req.method === "GET" && url.pathname === "/api/library/status")
@@ -120,7 +128,17 @@ export const server = createServer(async (req, res) => {
           return json(res, 404, {
             error: "Playlist not found. Choose another source.",
           });
-        collections.push(source === "curated" ? allSongs() : playlist.tracks);
+        collections.push(
+          (source === "curated" ? allSongs() : playlist.tracks).map((song) => ({
+            ...song,
+            poolSources: [
+              {
+                id: source,
+                name: source === "curated" ? "Built-in songs" : playlist.name,
+              },
+            ],
+          })),
+        );
       }
       const songs = mergeSongs(...collections);
       const tracks = filterCatalog(songs, Object.fromEntries(url.searchParams));
@@ -142,6 +160,9 @@ export const server = createServer(async (req, res) => {
         playlists: playlists.map(({ tracks, ...p }) => ({
           ...p,
           count: tracks.length,
+          possiblyTruncated:
+            p.possiblyTruncated ??
+            (tracks.length >= 100 && tracks[0]?.origin === "spotify"),
         })),
       });
     }
