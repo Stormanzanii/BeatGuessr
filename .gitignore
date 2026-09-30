@@ -1,0 +1,15 @@
+node_modules/
+data/
+test-results/
+.env
+.env.*
+!.env.example
+*.log
+
+# Local research captures and downloaded third-party bundles.
+research/*
+!research/songspot-analysis.md
+!research/inspect-songspot.js
+
+.DS_Store
+Thumbs.db

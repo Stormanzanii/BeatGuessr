@@ -1,0 +1,787 @@
+:root {
+  --page: #111411;
+  --border: #343b30;
+  --text: #eaece5;
+  --muted: #989f91;
+  --accent: #bee56c;
+}
+.topbar {
+  max-width: 1540px;
+  padding: 0 32px;
+  height: 82px;
+}
+.brand {
+  font-size: 26px;
+  letter-spacing: -1px;
+}
+.brand::before {
+  content: "◉";
+  color: var(--accent);
+  margin-right: 10px;
+  font-size: 29px;
+}
+.workspace {
+  max-width: 1540px;
+  width: 100%;
+  padding: 0 32px;
+  margin: 32px auto 0;
+  display: grid;
+  grid-template-columns: 270px minmax(360px, 1fr) 270px;
+  gap: 20px;
+  align-items: stretch;
+}
+.panel {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: #191d18;
+  min-height: 760px;
+  min-width: 0;
+}
+.library,
+.session {
+  padding: 26px 23px;
+  display: flex;
+  flex-direction: column;
+}
+.eyebrow {
+  color: var(--accent);
+  font-size: 10px;
+  font-weight: 650;
+  letter-spacing: 1.7px;
+}
+.library h2,
+.session h2 {
+  font-size: 23px;
+  font-weight: 500;
+  letter-spacing: -0.6px;
+  margin-top: 13px;
+}
+.intro-copy {
+  margin-top: 9px;
+}
+.library #source-label {
+  margin-top: 28px;
+}
+.source-button {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  background: #242a20;
+  border-color: #424b38;
+}
+.source-option input {
+  accent-color: var(--accent);
+}
+.source-detail {
+  font-size: 10px;
+  line-height: 1.6;
+  color: var(--muted);
+}
+.source-dropdown {
+  background: #252c20;
+  border-color: #4c5b3e;
+}
+.source-option:hover {
+  background: #36422b;
+}
+.source-option small {
+  font-size: 9px;
+}
+.filter-settings {
+  margin-top: 23px;
+}
+.filter-settings > summary {
+  font-size: 12px;
+  color: #c7cebf;
+  padding: 16px 0;
+}
+.filter-row {
+  display: block;
+}
+.filter-row .field-label {
+  margin-top: 12px;
+}
+.filter-settings .decades {
+  gap: 5px;
+  margin-bottom: 13px;
+}
+.decades button {
+  font-size: 9px;
+  padding: 6px;
+  background: transparent;
+  border-color: #3f4935;
+}
+.decades button.selected {
+  border-color: #839c59;
+  background: #303d23;
+  color: var(--accent);
+}
+.year-fields input {
+  font-size: 12px;
+}
+select,
+input[type="number"],
+input[type="text"] {
+  background: #242a20;
+  border-color: #424b38;
+}
+.filter-actions {
+  flex-direction: column;
+  align-items: stretch;
+  margin-top: 17px;
+  gap: 13px;
+}
+.filter-actions .button {
+  width: 100%;
+  font-size: 12px;
+}
+.filter-actions .muted {
+  font-size: 10px;
+}
+.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #202c14;
+}
+.primary:hover {
+  background: #d0ee94;
+}
+.import-actions {
+  margin-top: 26px;
+  padding-top: 22px;
+  flex-direction: column;
+}
+.outlined {
+  border-color: #465039;
+}
+.outlined:hover,
+.skip:hover {
+  background: #303928;
+}
+.import-actions .button {
+  width: 100%;
+  font-size: 11px;
+}
+.library .manage-sources {
+  margin-top: auto;
+  padding-top: 15px;
+  border: 0;
+}
+.manage-sources > summary {
+  font-size: 10px;
+}
+.manage-sources p {
+  font-size: 10px;
+}
+.manage-sources #expand-library {
+  width: 100%;
+  font-size: 11px;
+}
+.manage-sources .playlist-row {
+  font-size: 10px;
+}
+.playlist-row .text-button {
+  font-size: 10px;
+}
+.game {
+  padding: 30px 30px 21px;
+  display: flex;
+  flex-direction: column;
+}
+.game-heading {
+  align-items: center;
+}
+.game-heading h1 {
+  font-size: 33px;
+  font-weight: 500;
+  letter-spacing: -1px;
+}
+.round-badge {
+  border: 1px solid #424b37;
+  border-radius: 20px;
+  font-size: 9px;
+  padding: 7px 10px;
+  white-space: nowrap;
+}
+.instructions {
+  font-size: 12px;
+  line-height: 1.7;
+  max-width: 360px;
+  margin-top: 10px;
+  color: var(--muted);
+}
+.record-scene {
+  flex: 1;
+  min-height: 280px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 25px 0 12px;
+}
+.record {
+  width: 270px;
+  height: 270px;
+  transform: rotate(-14deg);
+}
+.record svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.record.spinning {
+  animation: record-spin 4s linear infinite;
+}
+.listen-caption {
+  font-size: 11px;
+  text-align: center;
+  color: var(--muted);
+  margin: 8px 0 20px;
+}
+.player {
+  margin: 0;
+}
+.play-button {
+  height: 49px;
+  font-size: 13px;
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #1d2914;
+}
+.play-button:hover {
+  background: #d0ee94;
+}
+.audio-progress {
+  background: #3c4730;
+  margin-top: 11px;
+}
+.audio-progress > div {
+  background: var(--accent);
+}
+.clip-control {
+  display: block;
+  margin-top: 18px;
+}
+.clip-control > .field-label {
+  display: none;
+}
+.clip-steps {
+  gap: 8px;
+}
+.clip-steps button {
+  font-size: 15px;
+  padding: 11px 0;
+  background: #23291e;
+  border-color: #404b34;
+  color: #bdc7b0;
+}
+.clip-steps button.active {
+  background: #303e23;
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.clip-steps button.heard {
+  color: #9bad82;
+}
+.clip-steps button:hover {
+  border-color: #a9c77a;
+}
+#guess-form {
+  margin-top: 24px;
+  gap: 10px;
+}
+.guess-wrapper {
+  height: 48px;
+  border-color: #47533a;
+  background: #23291e;
+}
+.guess-wrapper input {
+  font-size: 12px;
+}
+.guess-wrapper button {
+  font-size: 11px;
+  background: #35432a;
+  border-color: #4a5c3a;
+  color: var(--accent);
+  padding: 8px 10px;
+}
+.skip {
+  border-color: #47533a;
+  font-size: 12px;
+  min-width: 72px;
+  background: #262e20;
+}
+.message {
+  font-size: 11px;
+  min-height: 34px;
+}
+.suggestions {
+  background: #252d20;
+  border-color: #526141;
+}
+.suggestions button:hover,
+.suggestions button[aria-selected="true"] {
+  background: #39472d;
+}
+.game-bottom {
+  gap: 16px;
+  margin-top: 14px;
+  padding-top: 15px;
+}
+.game-bottom .text-button {
+  font-size: 10px;
+}
+#audio-source {
+  font-size: 8px;
+  letter-spacing: 0.2px;
+  flex-basis: auto;
+}
+.reveal {
+  margin-top: 14px;
+  padding-top: 17px;
+}
+.reveal.won {
+  animation: answer-in 0.55s cubic-bezier(0.2, 1.7, 0.4, 1);
+}
+.reveal-info h2 {
+  font-size: 20px;
+}
+.reveal .button {
+  font-size: 11px;
+}
+.record-scene.revealed .record {
+  animation: record-win 0.6s ease-out;
+}
+.stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: 33px;
+}
+.stats > div {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.stats strong {
+  font-size: 40px;
+  font-weight: 400;
+  letter-spacing: -1.5px;
+}
+.stats span {
+  font-size: 10px;
+  color: var(--muted);
+}
+.best-stat {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px;
+  background: #242e1d;
+  border: 1px solid #465437;
+  border-radius: 6px;
+  margin-top: 24px;
+  font-size: 10px;
+  color: #bdc7b0;
+}
+.best-stat strong {
+  font-size: 13px;
+  color: var(--accent);
+  font-weight: 500;
+}
+.panel-divider {
+  height: 1px;
+  background: var(--border);
+  margin: 25px 0;
+}
+.session .field-label {
+  margin: 0 0 15px;
+}
+.volume-label {
+  font-size: 11px;
+  margin: 0 0 15px;
+}
+.session input[type="range"] {
+  accent-color: var(--accent);
+  margin: 0 0 18px;
+}
+.toggle-row {
+  font-size: 11px;
+  color: #c8d0be;
+  margin: 16px 0 0;
+}
+.toggle-row input {
+  accent-color: var(--accent);
+}
+.session .settings {
+  margin-top: 19px;
+}
+.settings summary {
+  font-size: 10px;
+}
+.session .recent-tracks {
+  padding: 0;
+  min-height: 90px;
+}
+.recent-tracks > .muted {
+  font-size: 11px;
+}
+.recent-track {
+  gap: 8px;
+  padding: 11px 0;
+  border-bottom: 1px solid #30392a;
+}
+.recent-track strong {
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.recent-track > div > span {
+  display: block;
+  font-size: 10px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.recent-track > small {
+  font-size: 10px;
+  flex-shrink: 0;
+}
+.recent-icon.won {
+  color: var(--accent);
+}
+.session-note {
+  font-size: 10px;
+  color: var(--muted);
+  margin-top: auto;
+  border-top: 1px solid var(--border);
+  padding-top: 19px;
+}
+.session .panel-divider + .field-label {
+  margin-top: 0;
+}
+footer {
+  max-width: 1540px;
+  padding: 0 32px;
+  margin: 24px auto 30px;
+  font-size: 10px;
+}
+dialog {
+  background: #1e251a;
+  border-color: #4d5b3e;
+}
+.confetti {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  pointer-events: none;
+  z-index: 9999;
+}
+@keyframes record-spin {
+  from {
+    transform: rotate(-14deg);
+  }
+  to {
+    transform: rotate(346deg);
+  }
+}
+@keyframes record-win {
+  0% {
+    transform: rotate(-14deg) scale(1);
+  }
+  45% {
+    transform: rotate(10deg) scale(1.12);
+  }
+  100% {
+    transform: rotate(-14deg) scale(1);
+  }
+}
+@keyframes answer-in {
+  from {
+    transform: translateY(12px) scale(0.97);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+}
+@media (min-width: 1700px) {
+  .workspace {
+    margin-top: 45px;
+    grid-template-columns: 290px minmax(400px, 1fr) 290px;
+  }
+  .panel {
+    min-height: 820px;
+  }
+  .game {
+    padding: 34px 37px 24px;
+  }
+  .record {
+    width: 300px;
+    height: 300px;
+  }
+}
+@media (max-width: 1150px) {
+  .workspace {
+    grid-template-columns: 220px minmax(330px, 1fr) 220px;
+    gap: 14px;
+    padding: 0 20px;
+  }
+  .library,
+  .session {
+    padding: 23px 17px;
+  }
+  .game {
+    padding: 25px 22px 20px;
+  }
+  .record {
+    width: 245px;
+    height: 245px;
+  }
+  .game-heading h1 {
+    font-size: 28px;
+  }
+  .game-bottom {
+    flex-wrap: wrap;
+  }
+  #audio-source {
+    flex-basis: 100%;
+    margin-left: 0;
+  }
+  .library h2,
+  .session h2 {
+    font-size: 21px;
+  }
+  .round-badge {
+    font-size: 8px;
+  }
+  .panel {
+    min-height: 780px;
+  }
+}
+@media (max-width: 900px) {
+  .workspace {
+    grid-template-columns: 230px minmax(330px, 1fr);
+    max-width: 850px;
+  }
+  .session {
+    grid-column: 1/-1;
+    min-height: 0;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    column-gap: 35px;
+  }
+  .session > .eyebrow,
+  .session > h2,
+  .session > .stats,
+  .session > .best-stat {
+    grid-column: 1;
+  }
+  .session > .stats {
+    margin-top: 15px;
+  }
+  .session > .best-stat {
+    margin-bottom: 0;
+  }
+  .session > .panel-divider {
+    display: none;
+  }
+  .session > .field-label,
+  .session > .volume-label,
+  .session > #volume,
+  .session > .toggle-row,
+  .session > .settings {
+    grid-column: 2;
+  }
+  .session > .field-label {
+    grid-row: 1;
+  }
+  .session > .volume-label {
+    grid-row: 2;
+    align-self: end;
+    margin-bottom: 0;
+  }
+  .session > #volume {
+    grid-row: 3;
+    align-self: center;
+  }
+  .session > .toggle-row {
+    grid-row: 4;
+  }
+  .session > .settings {
+    grid-row: 5;
+  }
+  .session > .field-label:nth-last-of-type(2) {
+    display: none;
+  }
+  .session > .recent-tracks {
+    grid-column: 1/-1;
+    margin-top: 20px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 15px;
+  }
+  .session .recent-track {
+    width: calc(50% - 10px);
+  }
+  .session-note {
+    grid-column: 1/-1;
+    margin-top: 18px;
+  }
+  .library,
+  .game {
+    min-height: 760px;
+  }
+}
+@media (max-width: 640px) {
+  .topbar {
+    height: 70px;
+    padding: 0 18px;
+  }
+  .brand {
+    font-size: 23px;
+  }
+  .workspace {
+    display: flex;
+    flex-direction: column;
+    padding: 0 14px;
+    margin-top: 18px;
+    gap: 16px;
+  }
+  .game {
+    order: 0;
+    min-height: 0;
+    padding: 24px 20px 19px;
+  }
+  .library {
+    order: 1;
+    min-height: 0;
+    padding: 24px;
+  }
+  .session {
+    order: 2;
+    display: flex;
+    min-height: 0;
+    padding: 24px;
+  }
+  .game-heading h1 {
+    font-size: 29px;
+  }
+  .record-scene {
+    min-height: 240px;
+    padding: 20px 0 6px;
+  }
+  .record {
+    height: 235px;
+    width: 235px;
+  }
+  .listen-caption {
+    margin-top: 5px;
+    font-size: 10px;
+  }
+  .clip-control {
+    margin-top: 15px;
+  }
+  .clip-steps button {
+    font-size: 14px;
+  }
+  .game-bottom {
+    gap: 18px;
+    flex-wrap: wrap;
+  }
+  .game-bottom #audio-source {
+    flex-basis: 100%;
+  }
+  .game .reveal > .button {
+    width: 100%;
+  }
+  .filter-row {
+    display: flex;
+  }
+  .decades button {
+    font-size: 10px;
+    flex: 1;
+  }
+  .library .manage-sources {
+    margin-top: 18px;
+  }
+  .filter-actions {
+    flex-direction: row;
+    align-items: center;
+  }
+  .filter-actions .button {
+    width: auto;
+  }
+  .import-actions {
+    flex-direction: row;
+  }
+  .import-actions .button {
+    width: auto;
+    flex: 1;
+  }
+  .session > .panel-divider {
+    display: block;
+  }
+  .session > .field-label {
+    display: block !important;
+  }
+  .session > .stats {
+    margin-top: 25px;
+  }
+  .session > .volume-label {
+    margin-bottom: 18px;
+  }
+  .session > #volume {
+    margin-bottom: 16px;
+    align-self: stretch;
+  }
+  .session > .recent-tracks {
+    display: block;
+    margin-top: 0;
+  }
+  .session .recent-track {
+    width: 100%;
+  }
+  .session-note {
+    margin-top: 25px;
+  }
+  footer {
+    padding: 0 20px;
+    font-size: 9px;
+    margin-top: 22px;
+  }
+  .guess-wrapper button {
+    font-size: 10px;
+  }
+  .skip {
+    min-width: 62px;
+  }
+  .session .best-stat {
+    margin-bottom: 0;
+  }
+}
+.confetti-setting {
+  margin: 24px 0 8px;
+}
+.confetti-setting .volume-label {
+  margin-bottom: 12px;
+}
+.session .confetti-setting input[type="range"] {
+  margin: 0;
+}
+.range-endpoints {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 10px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .record.spinning,
+  .record-scene.revealed .record,
+  .reveal.won {
+    animation: none;
+  }
+}

@@ -1,0 +1,257 @@
+import { createServer } from "node:http";
+import { readFile, writeFile, mkdir, rename } from "node:fs/promises";
+import { resolve, extname, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
+import { genres, filterCatalog, mergeSongs } from "./catalog.js";
+import { allSongs, expandLibrary, libraryStatus } from "./library.js";
+import { resolveSong, media, fetchAudio } from "./providers.js";
+import { spotifyPlaylistId, parseSpotifyEmbed, parseCSV } from "./playlists.js";
+
+const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const playlistPath = resolve(root, "data/playlists.json");
+let playlists;
+try {
+  playlists = JSON.parse(await readFile(playlistPath, "utf8"));
+} catch (error) {
+  if (error.code !== "ENOENT") throw error;
+  playlists = [];
+}
+let saveQueue = Promise.resolve();
+function save() {
+  const snapshot = JSON.stringify(playlists, null, 2);
+  saveQueue = saveQueue
+    .catch(() => {})
+    .then(async () => {
+      await mkdir(dirname(playlistPath), { recursive: true });
+      await writeFile(`${playlistPath}.tmp`, snapshot);
+      await rename(`${playlistPath}.tmp`, playlistPath);
+    });
+  return saveQueue;
+}
+const audioCache = new Map();
+const audioTasks = new Map();
+async function audioFor(song) {
+  const cached = audioCache.get(song.id);
+  if (cached && Date.now() - cached.at < 10 * 60 * 1000) return cached;
+  if (audioTasks.has(song.id)) return audioTasks.get(song.id);
+  const task = fetchAudio(song)
+    .then((result) => {
+      const entry = { ...result, at: Date.now() };
+      audioCache.set(song.id, entry);
+      while (audioCache.size > 20)
+        audioCache.delete(audioCache.keys().next().value);
+      return entry;
+    })
+    .finally(() => audioTasks.delete(song.id));
+  audioTasks.set(song.id, task);
+  return task;
+}
+
+function json(res, status, data) {
+  res.writeHead(status, {
+    "Content-Type": "application/json; charset=utf-8",
+    "Cache-Control": "no-store",
+  });
+  res.end(JSON.stringify(data));
+}
+async function body(req) {
+  const chunks = [];
+  let size = 0;
+  for await (const chunk of req) {
+    size += chunk.length;
+    if (size > 4 * 1024 * 1024) {
+      const error = new Error("Import is too large (4 MB maximum).");
+      error.status = 413;
+      throw error;
+    }
+    chunks.push(chunk);
+  }
+  try {
+    return JSON.parse(Buffer.concat(chunks).toString("utf8"));
+  } catch {
+    const error = new Error("Invalid JSON request.");
+    error.status = 400;
+    throw error;
+  }
+}
+const types = {
+  ".html": "text/html",
+  ".js": "text/javascript",
+  ".css": "text/css",
+  ".svg": "image/svg+xml",
+  ".csv": "text/csv",
+};
+
+export const server = createServer(async (req, res) => {
+  try {
+    const url = new URL(req.url, "http://localhost");
+    if (
+      req.method !== "GET" &&
+      req.headers.origin &&
+      !/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(req.headers.origin)
+    ) {
+      return json(res, 403, { error: "Only the local app can make changes." });
+    }
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    if (req.method === "GET" && url.pathname === "/api/health")
+      return json(res, 200, { ok: true, songs: allSongs().length });
+    if (req.method === "GET" && url.pathname === "/api/library/status")
+      return json(res, 200, { ...libraryStatus, songs: allSongs().length });
+    if (req.method === "POST" && url.pathname === "/api/library/expand") {
+      expandLibrary();
+      return json(res, 202, libraryStatus);
+    }
+    if (req.method === "GET" && url.pathname === "/api/catalog") {
+      const sources = [
+        ...new Set(
+          (
+            url.searchParams.get("sources") ??
+            url.searchParams.get("source") ??
+            "curated"
+          )
+            .split(",")
+            .filter(Boolean),
+        ),
+      ];
+      const collections = [];
+      for (const source of sources) {
+        const playlist = playlists.find((p) => p.id === source);
+        if (source !== "curated" && !playlist)
+          return json(res, 404, {
+            error: "Playlist not found. Choose another source.",
+          });
+        collections.push(source === "curated" ? allSongs() : playlist.tracks);
+      }
+      const songs = mergeSongs(...collections);
+      const tracks = filterCatalog(songs, Object.fromEntries(url.searchParams));
+      return json(res, 200, {
+        tracks,
+        total: songs.length,
+        genres: [...new Set([...genres, ...songs.map((t) => t.genre)])].sort(),
+        duplicatesRemoved: collections.flat().length - songs.length,
+        sources,
+        note:
+          sources.length === 1
+            ? playlists.find((p) => p.id === sources[0])?.note || null
+            : null,
+      });
+    }
+    if (req.method === "GET" && url.pathname === "/api/playlists") {
+      return json(res, 200, {
+        catalogCount: allSongs().length,
+        playlists: playlists.map(({ tracks, ...p }) => ({
+          ...p,
+          count: tracks.length,
+        })),
+      });
+    }
+    if (req.method === "POST" && url.pathname === "/api/playlists/import") {
+      const input = await body(req);
+      let playlist;
+      if (typeof input.csv === "string")
+        playlist = parseCSV(input.csv, input.name || "Imported playlist");
+      else {
+        const id =
+          typeof input.url === "string" && spotifyPlaylistId(input.url.trim());
+        if (!id)
+          return json(res, 400, {
+            error:
+              "Paste a Spotify playlist URL, URI, or 22-character playlist ID.",
+          });
+        const response = await fetch(
+          `https://open.spotify.com/embed/playlist/${id}`,
+          { signal: AbortSignal.timeout(15000) },
+        );
+        if (!response.ok)
+          throw new Error(
+            "Could not open this public playlist. Check the link or use CSV import.",
+          );
+        playlist = parseSpotifyEmbed(await response.text(), id);
+      }
+      const old =
+        playlist.spotifyUrl &&
+        playlists.findIndex((p) => p.spotifyUrl === playlist.spotifyUrl);
+      if (typeof old === "number" && old >= 0) {
+        playlist.id = playlists[old].id;
+        playlists[old] = playlist;
+      } else playlists.push(playlist);
+      await save();
+      return json(res, 201, {
+        playlist: {
+          ...playlist,
+          tracks: undefined,
+          count: playlist.tracks.length,
+        },
+      });
+    }
+    if (req.method === "DELETE" && url.pathname.startsWith("/api/playlists/")) {
+      const id = url.pathname.slice("/api/playlists/".length);
+      playlists = playlists.filter((p) => p.id !== id);
+      await save();
+      return json(res, 200, { ok: true });
+    }
+    if (req.method === "POST" && url.pathname === "/api/resolve") {
+      const input = await body(req);
+      const seed =
+        allSongs().find((t) => t.id === input.id) ||
+        playlists.flatMap((p) => p.tracks).find((t) => t.id === input.id);
+      if (!seed)
+        return json(res, 404, { error: "Song not found in your library." });
+      return json(res, 200, {
+        track: await resolveSong(seed, input.failedSource),
+      });
+    }
+    if (req.method === "GET" && url.pathname.startsWith("/api/audio/")) {
+      const id = decodeURIComponent(url.pathname.slice("/api/audio/".length));
+      const song = media.get(id);
+      if (!song)
+        return json(res, 404, { error: "Preview expired. Start a new round." });
+      const audio = await audioFor(song);
+      res.writeHead(200, {
+        "Content-Type": audio.type,
+        "Content-Length": audio.bytes.length,
+        "Cache-Control": "private, max-age=300",
+      });
+      return res.end(audio.bytes);
+    }
+    if (url.pathname.startsWith("/api/"))
+      return json(res, 404, { error: "Unknown endpoint." });
+    if (req.method !== "GET" && req.method !== "HEAD")
+      return json(res, 405, { error: "Method not allowed." });
+    const relative =
+      url.pathname === "/"
+        ? "index.html"
+        : decodeURIComponent(url.pathname).slice(1);
+    const publicRoot = resolve(root, "public");
+    const file = resolve(publicRoot, relative);
+    if (
+      !file.startsWith(publicRoot + "\\") &&
+      !file.startsWith(publicRoot + "/")
+    )
+      return json(res, 403, { error: "Invalid path." });
+    try {
+      const data = await readFile(file);
+      res.writeHead(200, {
+        "Content-Type": `${types[extname(file)] || "application/octet-stream"}; charset=utf-8`,
+      });
+      return res.end(req.method === "HEAD" ? undefined : data);
+    } catch (error) {
+      if (error.code !== "ENOENT") throw error;
+      return json(res, 404, { error: "File not found." });
+    }
+  } catch (error) {
+    json(res, error.status || 502, {
+      error: error.message || "Something went wrong. Try again.",
+    });
+  }
+});
+
+if (
+  process.argv[1] &&
+  resolve(process.argv[1]) === fileURLToPath(import.meta.url)
+) {
+  const port = Number(process.env.PORT || 3000);
+  server.listen(port, "127.0.0.1", () =>
+    console.log(`BeatGuessr is ready at http://localhost:${port}`),
+  );
+}

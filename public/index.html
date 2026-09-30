@@ -1,0 +1,593 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#161616" />
+    <title>BeatGuessr</title>
+    <link rel="icon" href="/icon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="/style.css" />
+    <link rel="stylesheet" href="/layout.css" />
+    <script type="module" src="/app.js"></script>
+  </head>
+  <body>
+    <header class="topbar">
+      <a class="brand" href="/">BeatGuessr</a>
+      <div class="top-actions">
+        <span class="local-badge">localhost</span
+        ><button id="help-button" class="text-button">How to play</button>
+      </div>
+    </header>
+    <main class="workspace">
+      <aside class="library panel">
+        <div class="eyebrow">THE COLLECTION</div>
+        <h2>Your music.</h2>
+        <p class="muted intro-copy">Mix playlists. Find your next track.</p>
+        <label class="field-label" id="source-label">Sources</label>
+        <div class="source-picker">
+          <button
+            id="source-button"
+            class="source-button"
+            type="button"
+            aria-expanded="false"
+            aria-controls="source-dropdown"
+            aria-labelledby="source-label source-button"
+          >
+            Built-in songs <span>▾</span>
+          </button>
+          <div id="source-dropdown" class="source-dropdown" hidden></div>
+        </div>
+        <div class="source-detail" id="source-detail">
+          Select multiple sources to combine their songs. Duplicate songs are
+          counted once.
+        </div>
+        <details class="filter-settings">
+          <summary>Genre & release years</summary>
+          <div class="filter-row">
+            <div>
+              <label class="field-label" for="genre">Genre</label
+              ><select id="genre">
+                <option value="All">All genres</option>
+              </select>
+            </div>
+            <div>
+              <span class="field-label">Release years</span>
+              <div class="year-fields">
+                <input
+                  id="year-from"
+                  type="number"
+                  min="1960"
+                  max="2100"
+                  value="1960"
+                  aria-label="Earliest release year"
+                /><span>to</span
+                ><input
+                  id="year-to"
+                  type="number"
+                  min="1960"
+                  max="2100"
+                  aria-label="Latest release year"
+                />
+              </div>
+            </div>
+          </div>
+          <div class="decades" aria-label="Quick year filters">
+            <button data-decade="all" class="selected">All years</button
+            ><button data-decade="1980">1980s</button
+            ><button data-decade="1990">1990s</button
+            ><button data-decade="2000">2000s</button
+            ><button data-decade="2010">2010s</button
+            ><button data-decade="2020">2020s</button>
+          </div>
+        </details>
+        <div class="filter-actions">
+          <span id="pool-count" class="muted">Loading collection…</span
+          ><button id="apply-filters" class="button primary">
+            Apply & new song
+          </button>
+        </div>
+        <div class="import-actions">
+          <button id="import-button" class="button outlined">
+            Import Spotify playlist / CSV</button
+          ><label class="button outlined" for="local-files"
+            >Add local audio</label
+          ><input
+            id="local-files"
+            type="file"
+            accept="audio/*,.mp3,.m4a,.wav,.ogg,.flac"
+            multiple
+            hidden
+          />
+        </div>
+        <p class="muted small">
+          Local files stay in this browser session. Use filenames like “Artist -
+          Title.mp3”.
+        </p>
+        <details class="manage-sources">
+          <summary>Manage imports & more songs</summary>
+          <div id="playlist-management"></div>
+          <button id="expand-library" class="button outlined">
+            Get more built-in songs
+          </button>
+          <p id="expand-message" class="muted small"></p>
+          <p class="muted small">
+            Spicetify users: export a complete playlist from the Spotify desktop
+            app.
+            <a href="/spicetify/beatguessr-export.js" download
+              >Download exporter</a
+            >.
+          </p>
+        </details>
+      </aside>
+      <section class="game panel" aria-labelledby="game-heading">
+        <div class="game-heading">
+          <h1 id="game-heading">Name that track.</h1>
+          <span id="round-number" class="round-badge">Round 1</span>
+        </div>
+        <p class="instructions">
+          Play a clip, then enter the song title. Skip to hear more.
+        </p>
+        <div class="record-scene" id="record-scene">
+          <div class="record" id="record">
+            <svg viewBox="0 0 300 300" aria-hidden="true">
+              <circle
+                cx="150"
+                cy="150"
+                r="146"
+                fill="#111410"
+                stroke="#49503f"
+              />
+              <circle
+                cx="150"
+                cy="150"
+                r="140"
+                fill="none"
+                stroke="#343b30"
+                stroke-width=".7"
+              />
+              <circle
+                cx="150"
+                cy="150"
+                r="136.9"
+                fill="none"
+                stroke="#282e27"
+                stroke-width=".7"
+              />
+              <circle
+                cx="150"
+                cy="150"
+                r="133.8"
+                fill="none"
+                stroke="#282e27"
+                stroke-width=".7"
+              />
+              <circle
+                cx="150"
+                cy="150"
+                r="130.7"
+                fill="none"
+                stroke="#343b30"
+                stroke-width=".7"
+              />
+              <circle
+                cx="150"
+                cy="150"
+                r="127.6"
+                fill="none"
+                stroke="#282e27"
+                stroke-width=".7"
+              />
+              <circle
+                cx="150"
+                cy="150"
+                r="124.5"
+                fill="none"
+                stroke="#282e27"
+                stroke-width=".7"
+              />
+              <circle
+                cx="150"
+                cy="150"
+                r="121.4"
+                fill="none"
+                stroke="#343b30"
+                stroke-width=".7"
+              />
+              <circle
+                cx="150"
+                cy="150"
+                r="118.3"
+                fill="none"
+                stroke="#282e27"
+                stroke-width=".7"
+              />
+              <circle
+                cx="150"
+                cy="150"
+                r="115.2"
+                fill="none"
+                stroke="#282e27"
+                stroke-width=".7"
+              />
+              <circle
+                cx="150"
+                cy="150"
+                r="112.1"
+                fill="none"
+                stroke="#343b30"
+                stroke-width=".7"
+              />
+              <circle
+                cx="150"
+                cy="150"
+                r="109"
+                fill="none"
+                stroke="#282e27"
+                stroke-width=".7"
+              />
+              <circle
+                cx="150"
+                cy="150"
+                r="105.9"
+                fill="none"
+                stroke="#282e27"
+                stroke-width=".7"
+              />
+              <circle
+                cx="150"
+                cy="150"
+                r="102.8"
+                fill="none"
+                stroke="#343b30"
+                stroke-width=".7"
+              />
+              <circle
+                cx="150"
+                cy="150"
+                r="99.69999999999999"
+                fill="none"
+                stroke="#282e27"
+                stroke-width=".7"
+              />
+              <circle
+                cx="150"
+                cy="150"
+                r="96.6"
+                fill="none"
+                stroke="#282e27"
+                stroke-width=".7"
+              />
+              <circle
+                cx="150"
+                cy="150"
+                r="93.5"
+                fill="none"
+                stroke="#343b30"
+                stroke-width=".7"
+              />
+              <circle
+                cx="150"
+                cy="150"
+                r="90.4"
+                fill="none"
+                stroke="#282e27"
+                stroke-width=".7"
+              />
+              <circle
+                cx="150"
+                cy="150"
+                r="87.3"
+                fill="none"
+                stroke="#282e27"
+                stroke-width=".7"
+              />
+              <circle
+                cx="150"
+                cy="150"
+                r="84.19999999999999"
+                fill="none"
+                stroke="#343b30"
+                stroke-width=".7"
+              />
+              <circle
+                cx="150"
+                cy="150"
+                r="81.1"
+                fill="none"
+                stroke="#282e27"
+                stroke-width=".7"
+              />
+              <circle
+                cx="150"
+                cy="150"
+                r="78"
+                fill="none"
+                stroke="#282e27"
+                stroke-width=".7"
+              />
+              <circle
+                cx="150"
+                cy="150"
+                r="74.89999999999999"
+                fill="none"
+                stroke="#343b30"
+                stroke-width=".7"
+              />
+              <circle
+                cx="150"
+                cy="150"
+                r="71.8"
+                fill="none"
+                stroke="#282e27"
+                stroke-width=".7"
+              />
+              <circle cx="150" cy="150" r="55" fill="#bee56c" />
+              <text
+                x="150"
+                y="132"
+                text-anchor="middle"
+                fill="#26341a"
+                font-size="12"
+                font-family="sans-serif"
+                font-weight="700"
+                letter-spacing="2"
+              >
+                BEATGUESSR
+              </text>
+              <text
+                x="150"
+                y="144"
+                text-anchor="middle"
+                fill="#26341a"
+                font-size="6"
+                font-family="sans-serif"
+                letter-spacing="1"
+              >
+                SIDE A · UNKNOWN TRACK
+              </text>
+              <circle cx="150" cy="158" r="6" fill="#141714" />
+              <text
+                x="150"
+                y="180"
+                text-anchor="middle"
+                fill="#26341a"
+                font-size="6"
+                font-family="sans-serif"
+                letter-spacing="1"
+              >
+                LISTEN CLOSELY
+              </text>
+            </svg>
+          </div>
+        </div>
+        <div id="listen-caption" class="listen-caption">
+          How little do you need to hear?
+        </div>
+        <div class="player">
+          <button id="play-button" class="play-button" disabled>
+            <span id="play-icon" aria-hidden="true">▶</span
+            ><span id="play-text">Loading song…</span>
+          </button>
+          <div class="audio-progress" aria-hidden="true">
+            <div id="audio-progress"></div>
+          </div>
+        </div>
+        <div class="clip-control">
+          <span class="field-label">Clip length</span>
+          <div class="clip-steps" aria-label="Clip length">
+            <button data-stage="0" class="active">0.1s</button
+            ><button data-stage="1">0.5s</button
+            ><button data-stage="2">2s</button><button data-stage="3">8s</button
+            ><button data-stage="4">15s</button>
+          </div>
+        </div>
+        <form id="guess-form" autocomplete="off">
+          <div class="guess-field">
+            <div class="guess-wrapper">
+              <input
+                id="guess"
+                placeholder="Song title"
+                aria-label="Song title"
+                role="combobox"
+                aria-autocomplete="list"
+                aria-expanded="false"
+                aria-controls="suggestions"
+                disabled
+              /><button
+                id="guess-button"
+                type="submit"
+                aria-label="Submit guess"
+                disabled
+              >
+                Guess
+              </button>
+            </div>
+            <div
+              id="suggestions"
+              class="suggestions"
+              role="listbox"
+              hidden
+            ></div>
+          </div>
+          <button id="skip-button" type="button" class="button skip" disabled>
+            Skip
+          </button>
+        </form>
+        <div id="message" class="message" role="status" aria-live="polite">
+          Loading a song…
+        </div>
+        <div id="guess-history" class="guess-history"></div>
+        <div id="reveal" class="reveal" hidden>
+          <img id="reveal-cover" alt="Album cover" hidden />
+          <div class="reveal-info">
+            <span id="reveal-result" class="result-label"></span>
+            <h2 id="reveal-title"></h2>
+            <p id="reveal-artist"></p>
+            <div id="reveal-links"></div>
+          </div>
+          <button id="next-button" class="button primary">Next song</button>
+        </div>
+        <div class="game-bottom">
+          <button id="give-up" class="text-button" disabled>
+            Reveal answer</button
+          ><button id="reroll" class="text-button">New song</button
+          ><span id="audio-source">Preview audio</span>
+        </div>
+      </section>
+      <aside class="session panel">
+        <div class="eyebrow">THIS SESSION</div>
+        <h2>Keep the streak.</h2>
+        <div class="stats">
+          <div><strong id="stat-solved">0</strong><span>Identified</span></div>
+          <div>
+            <strong id="stat-streak">0</strong><span>Current streak</span>
+          </div>
+        </div>
+        <div class="best-stat">
+          <span>Fastest guess</span><strong id="stat-best">—</strong>
+        </div>
+        <div class="panel-divider"></div>
+        <div class="field-label">Volume</div>
+        <div class="volume-label">
+          <span>Playback volume</span><span id="volume-value">60%</span>
+        </div>
+        <input
+          id="volume"
+          type="range"
+          min="0"
+          max="100"
+          value="60"
+          aria-label="Volume"
+        /><label class="toggle-row" for="auto-play"
+          ><input id="auto-play" type="checkbox" checked /><span
+            >Play after skipping</span
+          ></label
+        >
+        <details class="settings">
+          <summary>Audio & celebration settings</summary>
+          <label class="toggle-row" for="random-start"
+            ><input id="random-start" type="checkbox" /><span
+              >Random starting point</span
+            ></label
+          >
+          <div class="confetti-setting">
+            <div class="volume-label">
+              <label for="confetti-amount">Confetti</label
+              ><output id="confetti-value" for="confetti-amount">6×</output>
+            </div>
+            <input
+              id="confetti-amount"
+              type="range"
+              min="1"
+              max="20"
+              step="1"
+              value="6"
+              aria-valuetext="6 times"
+            />
+            <div class="range-endpoints" aria-hidden="true">
+              <span>1×</span><span>20×</span>
+            </div>
+          </div>
+        </details>
+        <div class="panel-divider"></div>
+        <div class="field-label">Recently played</div>
+        <div id="recent-tracks" class="recent-tracks">
+          <p class="muted">Completed songs appear here.</p>
+        </div>
+        <div class="session-note">Space to play · Enter to guess</div>
+      </aside>
+    </main>
+    <footer>
+      <span>Space to play · Enter to guess</span
+      ><span>Preview excerpts. Import local files for song intros.</span>
+    </footer>
+
+    <dialog id="import-dialog">
+      <div class="dialog-heading">
+        <h2>Import a playlist</h2>
+        <button
+          class="icon-button"
+          data-close="import-dialog"
+          aria-label="Close import"
+        >
+          ×
+        </button>
+      </div>
+      <p class="muted">
+        Paste a public Spotify playlist link. Songs are matched to Deezer or
+        Apple Music audio previews.
+      </p>
+      <form id="playlist-form">
+        <label class="field-label" for="playlist-url"
+          >Spotify playlist link</label
+        ><input
+          id="playlist-url"
+          type="text"
+          placeholder="https://open.spotify.com/playlist/…"
+          required
+        /><button
+          id="playlist-import-submit"
+          class="button primary wide"
+          type="submit"
+        >
+          Import playlist
+        </button>
+      </form>
+      <div class="or-divider">or import a CSV export</div>
+      <label class="button outlined wide" for="csv-file">Choose CSV file</label
+      ><input id="csv-file" type="file" accept=".csv,text/csv" hidden />
+      <p class="muted small">
+        For private or larger playlists, import CSV with Title and Artist
+        columns. Year and Genre are optional. Spotify export headers also work.
+        <a href="/example-playlist.csv" download>Example CSV</a>.
+      </p>
+      <p class="muted small">
+        Public embeds can omit songs, years, and genres. Playlists are saved on
+        this computer.
+      </p>
+      <div
+        id="import-message"
+        class="message"
+        role="status"
+        aria-live="polite"
+      ></div>
+    </dialog>
+    <dialog id="help-dialog">
+      <div class="dialog-heading">
+        <h2>How to play</h2>
+        <button
+          class="icon-button"
+          data-close="help-dialog"
+          aria-label="Close help"
+        >
+          ×
+        </button>
+      </div>
+      <ol class="how-to">
+        <li>Press Play to hear a 0.1-second clip.</li>
+        <li>
+          Type the song title, then press Enter or Guess. You can also select a
+          suggestion.
+        </li>
+        <li>
+          Wrong guesses and Skip advance to 0.5, 2, 8, then 15 seconds. Skip at
+          15 seconds reveals the answer.
+        </li>
+        <li>
+          Press Next song to keep playing. Use the collection panel for genre,
+          year, and playlist options. Check multiple sources to pool their
+          songs.
+        </li>
+      </ol>
+      <p class="muted">
+        Provider previews are excerpts, usually from the middle of a song. Add
+        local audio to hear actual intros.
+      </p>
+      <p class="muted small">
+        Songs with unknown years only appear with All years. Songs with unknown
+        genres appear under All genres or Unknown. Your settings and played-song
+        history stay in this browser.
+      </p>
+    </dialog>
+  </body>
+</html>
