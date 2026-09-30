@@ -32,7 +32,7 @@ export function celebrate(multiplier = 6) {
   const intensity = confettiMultiplier(multiplier);
   const total = reduced ? 110 : 1500 * intensity;
   const volleySize = total / 5;
-  const duration = reduced ? 2 : 12;
+  const duration = reduced ? 2 : Math.min(12, intensity * 2);
   const particles = Array.from({ length: total }, (_, i) => {
     const fromTop = i % 2 === 0;
     const left = i % 4 === 1;
@@ -51,12 +51,14 @@ export function celebrate(multiplier = 6) {
       // Five overlapping volleys, with a large burst immediately on the win.
       delay: reduced
         ? Math.random() * 0.3
-        : Math.floor(i / volleySize) * 1.05 + Math.random() * 0.3,
+        : Math.floor(i / volleySize) * (duration * 0.0875) +
+          Math.random() * (duration * 0.025),
       color: colors[i % colors.length],
     };
   });
   canvas.dataset.particles = String(total);
   canvas.dataset.multiplier = String(intensity);
+  canvas.dataset.duration = String(duration);
   let frame,
     last = performance.now();
   const started = last;
@@ -71,7 +73,10 @@ export function celebrate(multiplier = 6) {
     last = now;
     context.setTransform(dpr, 0, 0, dpr, 0, 0);
     context.clearRect(0, 0, width, height);
-    context.globalAlpha = Math.max(0, Math.min(1, (duration - elapsed) / 1.5));
+    context.globalAlpha = Math.max(
+      0,
+      Math.min(1, (duration - elapsed) / Math.min(1.5, duration * 0.2)),
+    );
     for (const p of particles) {
       if (elapsed < p.delay) continue;
       p.vx *= Math.pow(0.6, dt);
