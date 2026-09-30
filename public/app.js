@@ -32,8 +32,7 @@ const state = {
   won: false,
   selectedSources: Array.isArray(settings.sources)
     ? settings.sources
-    : [settings.source || "curated"],
-  catalogCount: 233,
+    : [settings.source].filter(Boolean),
   loading: true,
   round: 0,
   request: 0,
@@ -218,7 +217,9 @@ async function newRound() {
   if (!state.pool.length) {
     setLoading(false);
     return message(
-      "No songs match these filters. Try a wider year range or another genre.",
+      state.selectedSources.length
+        ? "No songs match these filters. Try a wider year range or another genre."
+        : "Choose a playlist, import a CSV, or add local audio to start playing.",
       "error",
     );
   }
@@ -302,7 +303,6 @@ function populateGenres(genres, selected = "All") {
 }
 function sourceOptions() {
   return [
-    { id: "curated", name: "Built-in songs", count: state.catalogCount },
     ...state.playlists,
     { id: "local", name: "Local audio", count: state.local.length },
   ];
@@ -319,12 +319,10 @@ function updateSourceLabel() {
 async function refreshSources(selected = state.selectedSources) {
   const data = await api("/api/playlists");
   state.playlists = data.playlists;
-  state.catalogCount = data.catalogCount || 233;
   const options = sourceOptions();
   state.selectedSources = (
     Array.isArray(selected) ? selected : [selected]
   ).filter((id) => options.some((s) => s.id === id));
-  if (!state.selectedSources.length) state.selectedSources = ["curated"];
   $("source-dropdown").replaceChildren();
   for (const source of options) {
     const label = document.createElement("label");
@@ -806,32 +804,6 @@ $("local-files").addEventListener("change", async () => {
   await changeSource();
   $("local-files").value = "";
 });
-$("expand-library").addEventListener("click", async () => {
-  try {
-    await api("/api/library/expand", { method: "POST" });
-    pollLibrary();
-  } catch (error) {
-    $("expand-message").textContent = error.message;
-  }
-});
-let libraryTimer;
-async function pollLibrary() {
-  clearTimeout(libraryTimer);
-  try {
-    const status = await api("/api/library/status");
-    $("expand-library").disabled = status.running;
-    $("expand-message").textContent = status.running
-      ? `${status.stage}: ${status.completed}/${status.total}`
-      : `${status.songs} built-in songs available.${status.errors ? " Some provider requests were unavailable." : ""}`;
-    if (status.running) libraryTimer = setTimeout(pollLibrary, 2000);
-    else if (state.catalogCount !== status.songs) {
-      await refreshSources();
-      $("pool-count").textContent = "Apply to use the expanded library";
-    }
-  } catch {
-    $("expand-library").disabled = false;
-  }
-}
 document.addEventListener("keydown", (event) => {
   if (
     event.target.closest("input, select, textarea, button") ||
@@ -864,7 +836,6 @@ async function init() {
     );
     populateGenres(data.genres, settings.genre || "All");
     updateDecades();
-    void pollLibrary();
     await applyFilters();
   } catch (error) {
     setLoading(false);

@@ -26,7 +26,7 @@ Open **http://localhost:3000**. Leave the terminal running while you play. Press
 
 If you downloaded a ZIP, extract it and open a terminal in the folder containing `package.json`, then run `npm ci` and `npm start`.
 
-The server listens on `127.0.0.1`, so it is accessible only on the computer running it. A fresh installation starts with 233 built-in songs. To expand the catalog, open **Manage imports & more songs → Get more built-in songs**, wait for it to finish, then click **Apply & new song**. Provider availability determines how many additional tracks are found. Personal playlists and generated catalog data are not bundled with the repository.
+The server listens on `127.0.0.1`, so it is accessible only on the computer running it. Import a Spotify playlist or CSV, or add local audio to start playing. The game uses your selected sources; there is no built-in popular-song pool or background catalog expansion. Personal playlists are not bundled with the repository.
 
 ### Use another port
 
@@ -83,9 +83,8 @@ A correct guess automatically plays a 30-second snippet alongside the celebratio
 
 ## Music sources
 
-The revealed answer shows which selected source supplied the song: the playlist name, Built-in songs, or Local audio. A song shared by multiple selected sources lists each source once. Deezer or Apple Music listening links identify the audio provider separately.
+The revealed answer shows which selected source supplied the song: the playlist name or Local audio. A song shared by multiple selected sources lists each source once. Deezer or Apple Music listening links identify the audio provider separately.
 
-- **Built-in songs:** 233 hand-selected tracks with original release years, plus the locally expanded catalog. Manage imports & more songs → Get more built-in songs fetches popular tracks for the built-in artists and their album dates from Deezer. The expanded catalog is saved in `data/expanded-catalog.json`. These additional dates describe the provider's album edition and can be reissue dates. Genre is inherited from the seed artist category.
 - **Public Spotify playlists:** paste a playlist URL, URI, or ID. The importer reads the metadata exposed by Spotify's public embed. Embeds can stop at 100 tracks and do not guarantee the complete playlist. They generally omit release years and genres. This is not an official Spotify Web API integration.
 - **CSV:** import complete or private playlists with `Title,Artist,Year,Genre` columns. Only Title and Artist are required. Common export headers such as Track Name, Artist Name(s), Album Release Date, and Track URI are also accepted. Quoted fields and duplicate rows are handled. See `public/example-playlist.csv`.
 - **Local audio:** add MP3, M4A, WAV, OGG, or another browser-supported audio format. Files remain in browser memory for that session. Filenames are parsed as `Artist - Title.ext`. Embedded tags are not read; local files have unknown genre and year.
@@ -131,7 +130,7 @@ Spotify's [developer policy](https://developer.spotify.com/policy) prohibits gam
 | `public/confetti.js`                        | Full-screen win celebration                                      |
 | `public/style.css`, `public/layout.css`     | Flat styling, equal-height desktop panels, responsive layout     |
 | `server/index.js`                           | Local HTTP server, API, persistence, restricted audio proxy      |
-| `server/catalog.js`, `server/library.js`    | Seed songs, deduplication, catalog expansion                     |
+| `server/catalog.js`                         | Song deduplication and genre/year filtering                       |
 | `server/providers.js`, `server/matching.js` | Preview lookup, matching, expiring URL refresh                   |
 | `server/playlists.js`                       | Spotify embed and CSV parsing                                    |
 | `research/songspot-analysis.md`             | Public-client reverse engineering and evidence                   |

@@ -7,7 +7,26 @@ const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
 const errors = [];
 page.on("pageerror", (error) => errors.push(error.message));
+let fixtureId;
 try {
+  const fixture = await page.request.post(
+    "http://localhost:3000/api/playlists/import",
+    {
+      data: {
+        name: "Browser fixture library",
+        csv: "Title,Artist,Year,Genre\nNumb,Linkin Park,2003,Rock\nSmells Like Teen Spirit,Nirvana,1991,Rock\nCreep,Radiohead,1992,Rock\nGet Lucky,Daft Punk,2013,Electronic\nDreams,Fleetwood Mac,1977,Rock",
+      },
+    },
+  );
+  assert.equal(fixture.status(), 201);
+  fixtureId = (await fixture.json()).playlist.id;
+  await page.addInitScript((id) => {
+    if (!localStorage.getItem("beatguessr:settings"))
+      localStorage.setItem(
+        "beatguessr:settings",
+        JSON.stringify({ sources: [id] }),
+      );
+  }, fixtureId);
   await page.goto("http://localhost:3000");
   await page.waitForFunction(() => !window.beatguessr.state.loading, null, {
     timeout: 120000,
@@ -78,7 +97,7 @@ try {
   assert.equal(await page.locator("#reveal").isVisible(), true);
   assert.equal(
     await page.locator("#reveal-source").textContent(),
-    "Source: Built-in songs",
+    "Source: Browser fixture library",
   );
   await page.waitForFunction(() => beatguessr.player.playing);
   const reward = await page.evaluate(() => beatguessr.player.lastSchedule);
@@ -143,6 +162,10 @@ try {
       ),
   );
   console.log("Combined genre and decade filters:", filtered.length, "songs.");
+
+  await page.locator("#source-button").click();
+  assert.equal(await page.locator('[data-source="curated"]').count(), 0);
+  await page.locator(`[data-source="${fixtureId}"]`).uncheck();
 
   await page.locator("#import-button").click();
   await page.locator("#csv-file").setInputFiles({
@@ -459,5 +482,9 @@ try {
   assert.deepEqual(errors, []);
   console.log("Mobile layout, help dialog, and browser error checks passed.");
 } finally {
+  if (fixtureId)
+    await page.request.delete(
+      `http://localhost:3000/api/playlists/${fixtureId}`,
+    );
   await browser.close();
 }
