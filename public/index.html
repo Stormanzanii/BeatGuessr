@@ -478,10 +478,14 @@
         <details class="settings">
           <summary>Audio & celebration settings</summary>
           <label class="toggle-row" for="random-start"
-            ><input id="random-start" type="checkbox" /><span
-              >Random starting point</span
-            ></label
+            ><input
+              id="random-start"
+              type="checkbox"
+              autocomplete="off"
+              aria-describedby="random-start-hint"
+            /><span>Random starting point</span></label
           >
+          <p id="random-start-hint" class="muted small" aria-live="polite"></p>
           <div class="confetti-setting">
             <div class="volume-label">
               <label for="confetti-amount">Confetti</label

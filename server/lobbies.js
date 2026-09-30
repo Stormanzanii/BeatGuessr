@@ -1,5 +1,7 @@
 import { randomBytes, randomUUID } from "node:crypto";
 import { normalize } from "./matching.js";
+import { randomClipStart } from "../public/clip-start.js";
+import { wasGuessedWrong } from "../public/guess-history.js";
 
 const lengths = [0.1, 0.5, 2, 8, 15];
 const fail = (message, status = 400) => {
@@ -14,7 +16,7 @@ export class LobbyHub {
     this.now = now;
     this.hostGrace = hostGrace;
   }
-  create(name, pool, owner) {
+  create(name, pool, owner, { randomStart = false } = {}) {
     this.prune();
     if (!pool.length) fail("Select at least one imported playlist with songs.");
     if (
@@ -30,6 +32,7 @@ export class LobbyHub {
     const room = {
       code,
       owner,
+      randomStart: randomStart === true,
       pool,
       players: new Map(),
       round: null,
@@ -47,6 +50,7 @@ export class LobbyHub {
       throw error;
     }
     room.hostId = player.id;
+    this.preload(room);
     return { room, player };
   }
   get(code) {
@@ -134,6 +138,7 @@ export class LobbyHub {
     const next = [...room.players.values()].find((p) => p.connected);
     if (next) {
       room.hostId = next.id;
+      if (room.round && next.duration) this.setTiming(room, next.duration);
       room.message = `${next.name} is now the host.`;
     }
     this.broadcast(room);
@@ -150,6 +155,8 @@ export class LobbyHub {
       message: room.message,
       serverNow: this.now(),
       poolCount: room.pool.length,
+      randomStart: room.randomStart,
+      wrongGuesses: round?.wrong.get(player.id) || [],
       players: [...room.players.values()].map((p) => ({
         id: p.id,
         name: p.name,
@@ -164,7 +171,18 @@ export class LobbyHub {
             number: room.roundNumber,
             phase: round.phase,
             stage: round.stage,
-            seconds: lengths[round.stage],
+            seconds:
+              Math.round(
+                Math.min(
+                  lengths[round.stage],
+                  Math.max(
+                    0,
+                    (round.duration ?? Infinity) - (round.offset || 0),
+                  ),
+                ) * 1000,
+              ) / 1000,
+            offset: round.offset,
+            artwork: !!round.track?.cover,
             playback: round.playback,
             votes: round.votes.size,
             votesNeeded: Math.max(1, Math.floor(voters.length / 2) + 1),
@@ -185,6 +203,9 @@ export class LobbyHub {
                 : null,
           }
         : null,
+      upcoming: room.preload?.asset
+        ? { id: room.preload.id, artwork: !!room.preload.asset.track.cover }
+        : null,
     };
   }
   broadcast(room) {
@@ -198,8 +219,24 @@ export class LobbyHub {
       id: randomUUID(),
       startsAt: this.now() + 1000,
       seconds,
-      offset: 0,
+      offset:
+        seconds === 30
+          ? Math.min(
+              round.offset || 0,
+              Math.max(0, (round.duration || 30) - 30),
+            )
+          : round.offset || 0,
     };
+  }
+  setTiming(room, duration) {
+    room.round.duration = duration;
+    if (room.round.offset === null)
+      room.round.offset = randomClipStart(duration);
+    else
+      room.round.offset = Math.min(
+        room.round.offset,
+        Math.max(0, duration - 0.1),
+      );
   }
   reveal(room) {
     if (!room.round || room.round.phase !== "guessing") return;
@@ -209,6 +246,7 @@ export class LobbyHub {
     room.message = "Round complete. Enjoy the track!";
   }
   skip(room) {
+    if (room.randomStart && room.round.offset === null) return;
     if (room.round.stage === 4) this.reveal(room);
     else {
       room.round.stage++;
@@ -230,46 +268,77 @@ export class LobbyHub {
     else if (room.round.votes.size >= Math.floor(unsolved.length / 2) + 1)
       this.skip(room);
   }
-  async next(room) {
-    const round = {
-      id: randomUUID(),
-      phase: "loading",
-      stage: 0,
-      votes: new Set(),
-      solved: new Set(),
-      playback: null,
-      track: null,
-      audio: null,
-    };
-    room.round = round;
-    room.roundNumber++;
-    room.message = "Loading the next song…";
-    for (const player of room.players.values()) player.ready = false;
-    this.broadcast(room);
+  preload(room) {
+    if (room.preload) return room.preload;
+    const queued = { id: randomUUID(), asset: null, task: null };
+    room.preload = queued;
     let candidates = room.pool.filter((song) => !room.used.has(song.id));
     if (!candidates.length) {
       room.used.clear();
-      candidates = [...room.pool];
+      candidates = room.pool.filter((song) => song.id !== room.round?.seedId);
     }
+    if (!candidates.length) candidates = [...room.pool];
+    else candidates = [...candidates];
     for (let i = candidates.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
       [candidates[i], candidates[j]] = [candidates[j], candidates[i]];
     }
-    for (const seed of candidates.slice(0, 8)) {
-      try {
-        const loaded = await this.loadTrack(seed);
-        if (room.round !== round || !this.rooms.has(room.code)) return;
-        round.track = { ...loaded.track, poolSources: seed.poolSources };
-        round.audio = loaded.audio;
-        round.phase = "guessing";
-        room.used.add(seed.id);
-        room.message =
-          "Audio is loading for everyone. The host controls playback.";
-        this.broadcast(room);
-        return;
-      } catch {
-        /* Try another song whose preview is available. */
+    queued.task = (async () => {
+      for (const seed of candidates.slice(0, 8)) {
+        if (!this.rooms.has(room.code)) return null;
+        try {
+          const loaded = await this.loadTrack(seed);
+          queued.asset = {
+            ...loaded,
+            track: { ...loaded.track, poolSources: seed.poolSources },
+            seedId: seed.id,
+          };
+          if (room.preload === queued && this.rooms.has(room.code))
+            this.broadcast(room);
+          return queued.asset;
+        } catch {
+          /* Try another playable song without blocking the current round. */
+        }
       }
+      return null;
+    })();
+    return queued;
+  }
+  async next(room) {
+    const queued = this.preload(room);
+    room.preload = null;
+    const round = {
+      id: queued.id,
+      phase: "loading",
+      stage: 0,
+      votes: new Set(),
+      solved: new Set(),
+      wrong: new Map(),
+      playback: null,
+      track: null,
+      audio: null,
+      offset: room.randomStart ? null : 0,
+    };
+    room.round = round;
+    room.roundNumber++;
+    room.message = "Loading the next song…";
+    for (const player of room.players.values()) {
+      player.ready = false;
+      player.duration = null;
+      player.lastGuess = -Infinity;
+    }
+    this.broadcast(room);
+    const loaded = await queued.task;
+    if (loaded) {
+      if (room.round !== round || !this.rooms.has(room.code)) return;
+      Object.assign(round, loaded);
+      round.phase = "guessing";
+      room.used.add(loaded.seedId);
+      room.message =
+        "Audio is loading for everyone. The host controls playback.";
+      this.broadcast(room);
+      this.preload(room);
+      return;
     }
     if (room.round === round) {
       room.round = null;
@@ -304,11 +373,29 @@ export class LobbyHub {
       fail("The round changed. Try again.");
     if (action.type === "ready") {
       player.ready = true;
+      if (
+        Number.isFinite(action.duration) &&
+        action.duration > 0 &&
+        action.duration <= 900
+      ) {
+        player.duration = action.duration;
+        if (player.id === room.hostId) this.setTiming(room, action.duration);
+      }
+      if (
+        round.phase === "guessing" &&
+        [...room.players.values()]
+          .filter((p) => p.connected)
+          .every((p) => p.ready)
+      )
+        room.message = "Everyone's ready. Name that track.";
+      this.settleVotes(room);
       this.broadcast(room);
       return;
     }
     if (round.phase === "loading") fail("The song is still loading.");
     if (action.type === "play") {
+      if (room.randomStart && round.offset === null)
+        fail("Wait for the host's audio to finish loading.");
       if ([...room.players.values()].some((p) => p.connected && !p.ready))
         fail("Wait for everyone to load the audio.");
       this.play(room, round.phase === "revealed" ? 30 : lengths[round.stage]);
@@ -325,14 +412,28 @@ export class LobbyHub {
     } else if (action.type === "guess") {
       if (round.solved.has(player.id))
         fail("You already identified this song.");
-      if (this.now() - player.lastGuess < 600)
-        fail("Wait a moment before guessing again.");
-      player.lastGuess = this.now();
       const text =
         typeof action.title === "string"
           ? action.title.trim().slice(0, 300)
           : "";
       if (!text) fail("Enter a song title.");
+      const guess = {
+        title: text,
+        artist:
+          typeof action.artist === "string"
+            ? action.artist.slice(0, 300)
+            : undefined,
+      };
+      const wrong = round.wrong.get(player.id) || [];
+      if (wasGuessedWrong(wrong, guess))
+        fail("You already tried that song. Choose another one.");
+      if (wrong.length >= 200)
+        fail(
+          "Guess limit reached for this round. Vote to skip or wait for the reveal.",
+        );
+      if (this.now() - player.lastGuess < 600)
+        fail("Wait a moment before guessing again.");
+      player.lastGuess = this.now();
       const titles = [
         round.track.title,
         round.track.matchedTitle,
@@ -351,7 +452,7 @@ export class LobbyHub {
         round.solved.add(player.id);
         round.votes.delete(player.id);
         player.score += [100, 80, 60, 40, 20][round.stage];
-      }
+      } else round.wrong.set(player.id, [...wrong, guess]);
       player.send?.({
         type: "guess-result",
         correct,

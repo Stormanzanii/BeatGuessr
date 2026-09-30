@@ -156,3 +156,73 @@ test("public sessions use signed cookies and restrict cross-origin commands", ()
   assert.equal(access.allowsOrigin("https://beatguessr.clypdat.xyz"), true);
   assert.equal(access.allowsOrigin("https://other.example"), false);
 });
+
+test("starting a round consumes the prepared song while another warms in the background", async () => {
+  let release;
+  let calls = 0;
+  const hub = new LobbyHub(async (seed) => {
+    if (++calls > 1)
+      await new Promise((resolve) => {
+        release = resolve;
+      });
+    return {
+      track: seed,
+      audio: { bytes: Buffer.from("prepared"), type: "audio/mpeg" },
+    };
+  });
+  const { room } = hub.create("Host", pool, "owner");
+  const prepared = room.preload;
+  await prepared.task;
+  await hub.next(room);
+  assert.equal(room.round.id, prepared.id);
+  assert.equal(room.round.audio, prepared.asset.audio);
+  assert.equal(room.round.phase, "guessing");
+  assert.equal(calls, 2);
+  release();
+  await room.preload.task;
+});
+
+test("only the host's decoded audio sets a room's shared random point", async () => {
+  const { hub, room, host, players } = setup();
+  room.randomStart = true;
+  await hub.next(room);
+  const roundId = room.round.id;
+  await hub.command(room, players[1], {
+    type: "ready",
+    roundId,
+    duration: 900,
+  });
+  assert.equal(room.round.offset, null);
+  await hub.command(room, host, { type: "ready", roundId, duration: 30 });
+  const offset = room.round.offset;
+  assert.ok(offset > 0 && offset <= 15);
+  for (const player of players.slice(1))
+    await hub.command(room, player, { type: "ready", roundId, duration: 1 });
+  assert.equal(room.round.offset, offset);
+  await hub.command(room, host, { type: "play", roundId });
+  assert.equal(room.round.playback.offset, offset);
+  await hub.command(room, host, { type: "skip", roundId });
+  assert.equal(room.round.playback.offset, offset);
+});
+
+test("wrong guesses are private, reject repeats, survive reconnects, and reset each round", async () => {
+  const { hub, room, host, players } = setup();
+  await hub.next(room);
+  const guess = {
+    type: "guess",
+    roundId: room.round.id,
+    title: "Wrong Song",
+    artist: "Wrong Artist",
+  };
+  await hub.command(room, players[1], guess);
+  assert.equal(hub.snapshot(room, players[1]).wrongGuesses.length, 1);
+  assert.deepEqual(hub.snapshot(room, host).wrongGuesses, []);
+  await assert.rejects(hub.command(room, players[1], guess), /already tried/);
+  await hub.command(room, players[2], guess);
+  hub.disconnect(room, players[1]);
+  hub.connect(room, players[1], () => {});
+  assert.equal(hub.snapshot(room, players[1]).wrongGuesses.length, 1);
+  hub.reveal(room);
+  await hub.next(room);
+  assert.deepEqual(hub.snapshot(room, players[1]).wrongGuesses, []);
+});

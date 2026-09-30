@@ -1,6 +1,11 @@
 import { ClipPlayer, CLIP_LENGTHS } from "./audio.js";
 import { celebrate, confettiMultiplier } from "./confetti.js";
 import { mergeSuggestions } from "./guess-search.js";
+import {
+  normalizeGuess as cleanTitle,
+  wasGuessedWrong,
+  nextEnabledSuggestion,
+} from "./guess-history.js";
 
 const $ = (id) => document.getElementById(id);
 const year = new Date().getFullYear();
@@ -30,6 +35,7 @@ const state = {
   stage: 0,
   done: false,
   won: false,
+  randomStart: settings.randomStart === true,
   selectedSources: Array.isArray(settings.sources)
     ? settings.sources
     : [settings.source].filter(Boolean),
@@ -55,6 +61,86 @@ const player = new ClipPlayer(
 );
 // Useful for inspecting actual audio scheduling in browser devtools.
 window.beatguessr = { state, player };
+let nextSong, activePreparation;
+Object.defineProperty(window.beatguessr, "preloaded", {
+  get: () => !!nextSong?.ready,
+});
+function discardPreload() {
+  nextSong?.controller.abort();
+  activePreparation?.abort();
+  nextSong = null;
+  activePreparation = null;
+}
+function prepareNextSong() {
+  const pool = state.pool,
+    controller = new AbortController(),
+    signal = controller.signal;
+  const unseen = pool.filter((song) => !state.played.includes(song.id));
+  const alternatives = pool.filter((song) => song.id !== state.played[0]);
+  const candidates = [
+    ...(unseen.length ? unseen : alternatives.length ? alternatives : pool),
+  ];
+  for (let i = candidates.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [candidates[i], candidates[j]] = [candidates[j], candidates[i]];
+  }
+  const task = (async () => {
+    let lastError;
+    for (const seed of candidates.slice(0, 8)) {
+      signal.throwIfAborted();
+      try {
+        let track, buffer, artwork;
+        const warmArt = () => {
+          if (!track.cover) return;
+          artwork = new Image();
+          artwork.src = track.cover;
+          void artwork.decode().catch(() => {});
+        };
+        if (seed.origin === "local") {
+          track = { ...seed, source: "Local file" };
+          buffer = await player.decode(await seed.file.arrayBuffer());
+        } else {
+          ({ track } = await api("/api/resolve", {
+            method: "POST",
+            signal,
+            body: JSON.stringify({ id: seed.id }),
+          }));
+          warmArt();
+          try {
+            buffer = await loadPreview(track, signal);
+          } catch (error) {
+            signal.throwIfAborted();
+            ({ track } = await api("/api/resolve", {
+              method: "POST",
+              signal,
+              body: JSON.stringify({ id: seed.id, failedSource: track.source }),
+            }));
+            warmArt();
+            buffer = await loadPreview(track, signal);
+          }
+        }
+        signal.throwIfAborted();
+        return { seed, track, buffer, artwork };
+      } catch (error) {
+        signal.throwIfAborted();
+        lastError = error;
+      }
+    }
+    throw (
+      lastError ||
+      new Error("No playable previews found. Try another collection.")
+    );
+  })();
+  void task.catch(() => {});
+  const prepared = { pool, controller, task, ready: false };
+  void task.then(
+    () => {
+      prepared.ready = true;
+    },
+    () => {},
+  );
+  return prepared;
+}
 
 async function api(path, options) {
   const response = await fetch(
@@ -79,7 +165,27 @@ function playbackLabel(playing = player.playing) {
     const seconds = Math.round(Math.min(30, player.buffer.duration) * 10) / 10;
     return `Replay ${seconds}s snippet`;
   }
-  return `Play ${CLIP_LENGTHS[state.stage]}s clip`;
+  const available = player.buffer
+    ? Math.max(0, player.buffer.duration - player.offset)
+    : Infinity;
+  const seconds =
+    Math.round(Math.min(CLIP_LENGTHS[state.stage], available) * 1000) / 1000;
+  return `Play ${seconds}s clip`;
+}
+function updateRandomStartHint() {
+  $("random-start").checked = state.randomStart;
+  const hint = $("random-start-hint");
+  if (!state.randomStart)
+    hint.textContent = "Clips start at the beginning of the available audio.";
+  else if (!state.track || state.loading)
+    hint.textContent = "A new starting point is chosen each round.";
+  else if (state.done)
+    hint.textContent =
+      "The reveal plays up to 30s, so it may start earlier than the guessing clips.";
+  else if (!player.offset)
+    hint.textContent = "This audio is too short to randomize.";
+  else
+    hint.textContent = `This round starts ${player.offset.toFixed(player.offset < 1 ? 3 : 1)}s into ${state.track.origin === "local" ? "the song" : "the available preview"}.`;
 }
 function saveSettings() {
   persist("beatguessr:settings", {
@@ -88,7 +194,7 @@ function saveSettings() {
     from: $("year-from").value,
     to: $("year-to").value,
     volume: $("volume").value,
-    randomStart: $("random-start").checked,
+    randomStart: state.randomStart,
     autoPlay: $("auto-play").checked,
     confettiMultiplier: Number($("confetti-amount").value),
   });
@@ -101,6 +207,7 @@ function setLoading(loading) {
   $("guess-button").disabled = loading || state.done || !state.track;
   $("give-up").disabled = loading || state.done || !state.track;
   $("play-text").textContent = loading ? "Loading song…" : playbackLabel();
+  updateRandomStartHint();
 }
 function setStage(index) {
   player.stop();
@@ -110,7 +217,7 @@ function setStage(index) {
     button.classList.toggle("heard", i < index);
     button.setAttribute("aria-pressed", String(i === index));
   });
-  $("play-text").textContent = `Play ${CLIP_LENGTHS[index]}s clip`;
+  $("play-text").textContent = playbackLabel();
   $("skip-button").innerHTML =
     index === 4 ? "Reveal <span>↗</span>" : "Skip <span>↗</span>";
 }
@@ -148,7 +255,13 @@ function showReveal(won) {
   player.stop();
   clearSuggestions();
   const song = state.track,
-    seconds = CLIP_LENGTHS[state.stage];
+    seconds =
+      Math.round(
+        Math.min(
+          CLIP_LENGTHS[state.stage],
+          Math.max(0, player.buffer.duration - player.offset),
+        ) * 1000,
+      ) / 1000;
   if (won) {
     state.stats.solved++;
     state.stats.streak++;
@@ -187,7 +300,8 @@ function showReveal(won) {
   $("reveal-cover").onerror = () => {
     $("record-art").hidden = true;
   };
-  if (song.cover) $("reveal-cover").src = song.cover;
+  if (song.cover && $("reveal-cover").getAttribute("src") !== song.cover)
+    $("reveal-cover").src = song.cover;
   else $("reveal-cover").removeAttribute("src");
   $("reveal-links").replaceChildren();
   for (const [href, label] of [
@@ -250,67 +364,48 @@ async function newRound() {
     );
   }
   message("Loading a song…");
-  const unseen = state.pool.filter((t) => !state.played.includes(t.id));
-  const candidates = [...(unseen.length ? unseen : state.pool)];
-  // Shuffle once, then try distinct songs if a provider has no matching preview.
-  for (let i = candidates.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [candidates[i], candidates[j]] = [candidates[j], candidates[i]];
-  }
-  let lastError;
-  for (const seed of candidates.slice(0, 8)) {
+  activePreparation?.abort();
+  const prepared = nextSong?.pool === state.pool ? nextSong : prepareNextSong();
+  nextSong = null;
+  activePreparation = prepared.controller;
+  try {
+    const { seed, track, buffer, artwork } = await prepared.task;
     if (request !== state.request) return;
-    try {
-      let track, buffer;
-      if (seed.origin === "local") {
-        track = { ...seed, source: "Local file" };
-        buffer = await player.decode(await seed.file.arrayBuffer());
-      } else {
-        ({ track } = await api("/api/resolve", {
-          method: "POST",
-          body: JSON.stringify({ id: seed.id }),
-        }));
-        try {
-          buffer = await loadPreview(track);
-        } catch {
-          ({ track } = await api("/api/resolve", {
-            method: "POST",
-            body: JSON.stringify({ id: seed.id, failedSource: track.source }),
-          }));
-          buffer = await loadPreview(track);
-        }
-      }
-      if (request !== state.request) return;
-      player.setBuffer(buffer, $("random-start").checked);
-      state.track = { ...track, poolSources: seed.poolSources || [] };
-      state.round++;
-      state.played = [
-        seed.id,
-        ...state.played.filter((id) => id !== seed.id),
-      ].slice(0, 2000);
-      persist("beatguessr:played", state.played);
-      $("round-number").textContent =
-        `ROUND ${String(state.round).padStart(2, "0")}`;
-      $("audio-source").textContent =
-        seed.origin === "local"
-          ? "LOCAL AUDIO · ACTUAL INTRO"
-          : `${track.source.toUpperCase()} · PREVIEW EXCERPT`;
-      setLoading(false);
-      message("Ready when you are. Press play.");
-      return;
-    } catch (error) {
-      lastError = error;
+    activePreparation = null;
+    player.setBuffer(buffer, state.randomStart);
+    state.track = { ...track, poolSources: seed.poolSources || [] };
+    if (artwork) {
+      artwork.id = "reveal-cover";
+      artwork.alt = "";
+      $("reveal-cover").replaceWith(artwork);
     }
+    state.round++;
+    state.played = [
+      seed.id,
+      ...state.played.filter((id) => id !== seed.id),
+    ].slice(0, 2000);
+    persist("beatguessr:played", state.played);
+    $("round-number").textContent =
+      `ROUND ${String(state.round).padStart(2, "0")}`;
+    $("audio-source").textContent =
+      seed.origin === "local"
+        ? "LOCAL AUDIO · ACTUAL INTRO"
+        : `${track.source.toUpperCase()} · PREVIEW EXCERPT`;
+    setLoading(false);
+    message("Ready when you are. Press play.");
+    nextSong = prepareNextSong();
+    return;
+  } catch (error) {
+    if (request !== state.request || error.name === "AbortError") return;
+    activePreparation = null;
+    setLoading(false);
+    message(error.message, "error");
   }
-  if (request !== state.request) return;
-  setLoading(false);
-  message(
-    lastError?.message || "No playable previews found. Try another collection.",
-    "error",
-  );
 }
-async function loadPreview(track) {
-  const response = await fetch(`/api/audio/${encodeURIComponent(track.id)}`);
+async function loadPreview(track, signal) {
+  const response = await fetch(`/api/audio/${encodeURIComponent(track.id)}`, {
+    signal,
+  });
   if (!response.ok) {
     const data = await response.json();
     throw new Error(data.error || "Could not load audio.");
@@ -414,6 +509,7 @@ async function applyFilters() {
     );
   }
   const token = ++state.request;
+  discardPreload();
   player.stop();
   setLoading(true);
   try {
@@ -505,20 +601,10 @@ function updateDecades() {
     );
   });
 }
-function cleanTitle(value) {
-  return value
-    .normalize("NFKD")
-    .replace(/\p{M}/gu, "")
-    .toLowerCase()
-    .replace(/\s*\((feat\.?|ft\.?|with)\b[^)]*\)/gi, "")
-    .replace(
-      /\s*[-(]\s*(remaster(ed)?|radio edit|single version|album version|deluxe).*$/i,
-      "",
-    )
-    .replace(/[^\p{L}\p{N}]/gu, "");
-}
 function submitGuess(title, candidate) {
   if (state.loading || state.done || !state.track || !title.trim()) return;
+  if (wasGuessedWrong(state.wrong, candidate || { title }))
+    return message("You already tried that song. Choose another one.", "error");
   const target = cleanTitle(state.track.title),
     guess = cleanTitle(title);
   const correct = candidate
@@ -542,7 +628,10 @@ function submitGuess(title, candidate) {
   clearSuggestions();
   $("guess").value = "";
   if (correct) return showReveal(true);
-  state.wrong.push(title);
+  state.wrong.push({
+    title: candidate?.title || title,
+    artist: candidate?.artist,
+  });
   const entry = document.createElement("span");
   entry.textContent = `× ${title}`;
   $("guess-history").append(entry);
@@ -643,11 +732,24 @@ function renderSuggestions() {
     button.id = `suggestion-${index}`;
     button.setAttribute("role", "option");
     button.setAttribute("aria-selected", "false");
+    const wrong = wasGuessedWrong(state.wrong, song);
+    button.disabled = wrong;
+    button.classList.toggle("guessed-wrong", wrong);
+    button.setAttribute("aria-disabled", String(wrong));
     const title = document.createElement("strong");
     title.textContent = song.title;
+    const label = document.createElement("span");
+    label.className = "suggestion-title";
+    label.append(title);
+    if (wrong) {
+      const status = document.createElement("small");
+      status.className = "guess-status";
+      status.textContent = "Already guessed · incorrect";
+      label.append(status);
+    }
     const artist = document.createElement("span");
     artist.textContent = song.artist;
-    button.append(title, artist);
+    button.append(label, artist);
     button.addEventListener("click", () => submitGuess(song.title, song));
     $("suggestions").append(button);
   });
@@ -656,14 +758,19 @@ $("guess").addEventListener("input", searchSuggestions);
 $("guess").addEventListener("keydown", (event) => {
   if (["ArrowDown", "ArrowUp"].includes(event.key) && suggestions.length) {
     event.preventDefault();
-    state.suggestionIndex =
-      (state.suggestionIndex +
-        (event.key === "ArrowDown" ? 1 : -1) +
-        suggestions.length) %
-      suggestions.length;
+    state.suggestionIndex = nextEnabledSuggestion(
+      suggestions,
+      state.suggestionIndex,
+      event.key === "ArrowDown" ? 1 : -1,
+      (song) => wasGuessedWrong(state.wrong, song),
+    );
     [...$("suggestions").children].forEach((el, index) =>
       el.setAttribute("aria-selected", String(index === state.suggestionIndex)),
     );
+    if (state.suggestionIndex < 0) {
+      $("guess").removeAttribute("aria-activedescendant");
+      return;
+    }
     $("guess").setAttribute(
       "aria-activedescendant",
       `suggestion-${state.suggestionIndex}`,
@@ -723,8 +830,12 @@ $("volume").addEventListener("input", () => {
   saveSettings();
 });
 $("random-start").addEventListener("change", () => {
-  if (player.buffer) player.setStart($("random-start").checked);
+  state.randomStart = $("random-start").checked;
+  if (player.buffer) player.setStart(state.randomStart);
   saveSettings();
+  updateRandomStartHint();
+  if (!state.loading && state.track)
+    $("play-text").textContent = playbackLabel();
 });
 $("auto-play").addEventListener("change", saveSettings);
 function updateConfettiSetting() {
@@ -849,7 +960,7 @@ async function init() {
   $("volume").value = settings.volume ?? 60;
   $("volume-value").textContent = `${$("volume").value}%`;
   player.setVolume(Number($("volume").value) / 100);
-  $("random-start").checked = settings.randomStart ?? false;
+  $("random-start").checked = state.randomStart;
   $("auto-play").checked = settings.autoPlay ?? true;
   $("confetti-amount").value = confettiMultiplier(
     settings.confettiMultiplier ?? 6,

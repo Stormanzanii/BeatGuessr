@@ -1,3 +1,4 @@
+import { randomClipStart } from "./clip-start.js";
 export const CLIP_LENGTHS = [0.1, 0.5, 2, 8, 15];
 
 export class ClipPlayer {
@@ -33,9 +34,7 @@ export class ClipPlayer {
   }
   setStart(randomStart) {
     this.stop();
-    this.offset = randomStart
-      ? Math.random() * Math.max(0, this.buffer.duration - 15)
-      : 0;
+    this.offset = randomStart ? randomClipStart(this.buffer?.duration) : 0;
   }
   setVolume(value) {
     this.volume = value;

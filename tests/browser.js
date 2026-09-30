@@ -8,6 +8,7 @@ const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
 const errors = [];
 page.on("pageerror", (error) => errors.push(error.message));
 let fixtureId;
+const fixtureIds = new Set();
 try {
   const fixture = await page.request.post(
     "http://localhost:3000/api/playlists/import",
@@ -20,6 +21,7 @@ try {
   );
   assert.equal(fixture.status(), 201);
   fixtureId = (await fixture.json()).playlist.id;
+  fixtureIds.add(fixtureId);
   await page.addInitScript((id) => {
     if (!localStorage.getItem("beatguessr:settings"))
       localStorage.setItem(
@@ -188,6 +190,7 @@ try {
   const firstPlaylistId = await page.evaluate(
     () => beatguessr.state.selectedSources[0],
   );
+  fixtureIds.add(firstPlaylistId);
   await page
     .locator("#guess")
     .fill(await page.evaluate(() => beatguessr.state.track.title));
@@ -217,6 +220,8 @@ try {
     3,
     "Two overlapping playlists should combine to three unique songs",
   );
+  for (const id of await page.evaluate(() => beatguessr.state.selectedSources))
+    fixtureIds.add(id);
   assert.deepEqual(
     await page.evaluate(() =>
       beatguessr.state.pool
@@ -230,7 +235,11 @@ try {
       .filter((t) => t.title !== "Get Lucky")
       .map((t) => t.id);
   });
-  await page.locator("#reroll").click();
+  // Reapplying the pool invalidates a song already prepared before this setup.
+  await page.locator(".filter-settings").evaluate((element) => {
+    element.open = true;
+  });
+  await page.locator("#apply-filters").click();
   await page.waitForFunction(
     () =>
       !beatguessr.state.loading &&
@@ -483,9 +492,7 @@ try {
   assert.deepEqual(errors, []);
   console.log("Mobile layout, help dialog, and browser error checks passed.");
 } finally {
-  if (fixtureId)
-    await page.request.delete(
-      `http://localhost:3000/api/playlists/${fixtureId}`,
-    );
+  for (const id of fixtureIds)
+    await page.request.delete(`http://localhost:3000/api/playlists/${id}`);
   await browser.close();
 }

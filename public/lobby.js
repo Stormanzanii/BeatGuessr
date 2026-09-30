@@ -1,5 +1,6 @@
 import { ClipPlayer } from "./audio.js";
 import { celebrate, confettiMultiplier } from "./confetti.js";
+import { wasGuessedWrong, nextEnabledSuggestion } from "./guess-history.js";
 
 const $ = (id) => document.getElementById(id);
 const stored = (key, fallback) => {
@@ -29,6 +30,7 @@ let suggestions = [],
   searchRequest = 0,
   searchController;
 const celebrated = new Set();
+const mediaCache = new Map();
 const player = new ClipPlayer(
   (progress) => ($("room-progress").style.width = `${progress * 100}%`),
   (playing) => $("lobby-record").classList.toggle("spinning", playing),
@@ -38,9 +40,17 @@ window.beatguessrLobby = {
   get state() {
     return state;
   },
+  get preloaded() {
+    return [...mediaCache].map(([id, entry]) => ({
+      id,
+      audio: !!entry.buffer,
+      artwork: !!entry.image,
+    }));
+  },
 };
 $("room-code").value = code;
 $("nickname").value = stored("beatguessr:nickname", "");
+$("room-random-start").checked = settings.randomStart === true;
 $("room-volume").value = settings.volume ?? 60;
 player.setVolume(Number($("room-volume").value) / 100);
 function error(message = "") {
@@ -120,8 +130,12 @@ function connect() {
       readySentForRound = "";
     } else if (data.type === "state") {
       if (!state) serverOffset = data.state.serverNow - Date.now();
+      const wrongChanged =
+        JSON.stringify(state?.wrongGuesses) !==
+        JSON.stringify(data.state.wrongGuesses);
       state = data.state;
       render();
+      if (wrongChanged && suggestions.length) renderSuggestions();
     } else if (data.type === "pong")
       serverOffset = data.serverNow - (data.sent + Date.now()) / 2;
     else if (data.type === "guess-result") {
@@ -135,6 +149,7 @@ function connect() {
       error(data.message);
       if (/expired|not found|session opened/i.test(data.message)) {
         stopped = true;
+        pruneMedia();
         sessionStorage.removeItem(`beatguessr:room:${code}`);
         token = "";
         state = null;
@@ -180,10 +195,21 @@ async function enter(create) {
       ].map((input) => input.value);
       const created = await request("/api/lobbies", {
         method: "POST",
-        body: JSON.stringify({ name, sources: selected }),
+        body: JSON.stringify({
+          name,
+          sources: selected,
+          randomStart: $("room-random-start").checked,
+        }),
       });
       code = created.code;
       token = created.token;
+      localStorage.setItem(
+        "beatguessr:settings",
+        JSON.stringify({
+          ...stored("beatguessr:settings", {}),
+          randomStart: $("room-random-start").checked,
+        }),
+      );
     } else {
       code = $("room-code").value.trim().toUpperCase();
       if (!/^[A-Z0-9]{6}$/.test(code))
@@ -209,6 +235,61 @@ function clearSuggestions() {
   $("room-guess").setAttribute("aria-expanded", "false");
   $("room-guess").removeAttribute("aria-activedescendant");
 }
+function pruneMedia(keep = []) {
+  for (const [id, entry] of mediaCache)
+    if (!keep.includes(id)) {
+      entry.controller.abort();
+      if (entry.artworkURL) URL.revokeObjectURL(entry.artworkURL);
+      mediaCache.delete(id);
+    }
+}
+function warmMedia(round) {
+  if (mediaCache.has(round.id)) return mediaCache.get(round.id);
+  const entry = { controller: new AbortController() };
+  const signal = entry.controller.signal,
+    headers = { Authorization: `Bearer ${token}` };
+  mediaCache.set(round.id, entry);
+  entry.audio = (async () => {
+    const response = await fetch(`/api/lobbies/${code}/audio/${round.id}`, {
+      signal,
+      headers,
+    });
+    if (!response.ok)
+      throw new Error("Audio could not load. Use Enable audio to retry.");
+    const buffer = await player.decode(await response.arrayBuffer());
+    signal.throwIfAborted();
+    entry.buffer = buffer;
+    return buffer;
+  })();
+  void entry.audio.catch((error) => {
+    entry.error = error;
+  });
+  if (round.artwork)
+    void (async () => {
+      try {
+        const response = await fetch(
+          `/api/lobbies/${code}/artwork/${round.id}`,
+          { signal, headers },
+        );
+        if (!response.ok || response.status === 204) return;
+        const blob = await response.blob();
+        signal.throwIfAborted();
+        entry.artworkURL = URL.createObjectURL(blob);
+        const image = new Image();
+        image.src = entry.artworkURL;
+        await image.decode();
+        signal.throwIfAborted();
+        entry.image = image;
+        if (state?.round?.id === round.id) {
+          $("lobby-cover").src = entry.artworkURL;
+          $("lobby-cover").hidden = state.round.phase !== "revealed";
+        }
+      } catch {
+        /* Keep the vinyl label if an artwork provider is unavailable. */
+      }
+    })();
+  return entry;
+}
 async function loadAudio(round) {
   if (loadingRound === round.id || loadedRound === round.id) return;
   const requestId = ++audioTask;
@@ -216,14 +297,17 @@ async function loadAudio(round) {
   player.stop();
   playbackId = "";
   try {
-    const response = await fetch(`/api/lobbies/${code}/audio/${round.id}`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    if (!response.ok)
-      throw new Error("Audio could not load. Use Enable audio to retry.");
-    const buffer = await player.decode(await response.arrayBuffer());
+    if (mediaCache.get(round.id)?.error) {
+      const failed = mediaCache.get(round.id);
+      failed.controller.abort();
+      if (failed.artworkURL) URL.revokeObjectURL(failed.artworkURL);
+      mediaCache.delete(round.id);
+    }
+    const asset = warmMedia(round);
+    const buffer = asset.buffer || (await asset.audio);
     if (requestId !== audioTask || state?.round?.id !== round.id) return;
     player.setBuffer(buffer);
+    if (asset.artworkURL) $("lobby-cover").src = asset.artworkURL;
     loadedRound = round.id;
     loadingRound = "";
     markReady();
@@ -243,7 +327,7 @@ function markReady() {
     readySentForRound !== loadedRound
   ) {
     readySentForRound = loadedRound;
-    send("ready");
+    send("ready", { duration: player.buffer.duration });
   }
 }
 function playScheduled() {
@@ -262,7 +346,8 @@ function playScheduled() {
   const delay = (playback.startsAt - (Date.now() + serverOffset)) / 1000;
   const elapsed = Math.max(0, -delay),
     seconds = playback.seconds - elapsed;
-  if (seconds <= 0 || elapsed >= player.buffer.duration) return;
+  if (seconds <= 0 || playback.offset + elapsed >= player.buffer.duration)
+    return;
   void player
     .play(seconds, {
       offset: playback.offset + elapsed,
@@ -305,6 +390,9 @@ function render() {
       : round
         ? `${round.phase === "revealed" ? "30-second snippet" : `${round.seconds}s clip`} · ${state.players.filter((p) => p.connected && p.ready).length}/${state.players.filter((p) => p.connected).length} ready`
         : `${state.poolCount} songs in rotation`;
+  if (state.randomStart && round?.phase === "guessing" && round.offset != null)
+    $("clip-status").textContent +=
+      ` · Starts ${round.offset.toFixed(1)}s into the preview`;
   $("players").replaceChildren();
   for (const p of [...state.players].sort((a, b) => b.score - a.score)) {
     const row = document.createElement("div"),
@@ -360,8 +448,10 @@ function render() {
       .join(" · ");
     $("answer-sources").textContent =
       `Source: ${(track.poolSources || []).map((source) => source.name).join(" · ")}`;
-    if (track.cover && $("lobby-cover").getAttribute("src") !== track.cover) {
-      $("lobby-cover").src = track.cover;
+    const cover = mediaCache.get(round.id)?.artworkURL || track.cover;
+    if (cover) {
+      if ($("lobby-cover").getAttribute("src") !== cover)
+        $("lobby-cover").src = cover;
       $("lobby-cover").alt = `${track.title} artwork`;
       $("lobby-cover").hidden = false;
     }
@@ -384,13 +474,54 @@ function render() {
     void loadAudio(round);
     playScheduled();
   }
+  pruneMedia([round?.id, state.upcoming?.id]);
+  if (state.upcoming) warmMedia(state.upcoming);
 }
 function guess(candidate) {
   const title = candidate?.title || $("room-guess").value;
   if (!title.trim()) return;
+  if (wasGuessedWrong(state?.wrongGuesses, candidate || { title })) {
+    $("guess-feedback").textContent =
+      "You already tried that song. Choose another one.";
+    return;
+  }
   send("guess", { title, artist: candidate?.artist });
   clearSuggestions();
   $("room-guess").value = "";
+}
+function renderSuggestions() {
+  $("room-suggestions").replaceChildren();
+  suggestionIndex = -1;
+  $("room-guess").removeAttribute("aria-activedescendant");
+  suggestions.forEach((song, i) => {
+    const button = document.createElement("button"),
+      title = document.createElement("strong"),
+      artist = document.createElement("span");
+    button.type = "button";
+    button.id = `room-option-${i}`;
+    button.setAttribute("role", "option");
+    button.setAttribute("aria-selected", "false");
+    const wrong = wasGuessedWrong(state.wrongGuesses, song);
+    button.disabled = wrong;
+    button.classList.toggle("guessed-wrong", wrong);
+    button.setAttribute("aria-disabled", String(wrong));
+    title.textContent = song.title;
+    artist.textContent = song.artist;
+    const label = document.createElement("span");
+    label.className = "suggestion-title";
+    label.append(title);
+    if (wrong) {
+      const status = document.createElement("small");
+      status.className = "guess-status";
+      status.textContent = "Already guessed · incorrect";
+      label.append(status);
+    }
+    button.append(label, artist);
+    button.addEventListener("click", () => guess(song));
+    $("room-suggestions").append(button);
+  });
+  $("room-suggestions").hidden = !suggestions.length;
+  $("room-guess").setAttribute("aria-expanded", String(!!suggestions.length));
 }
 $("room-guess").addEventListener("input", () => {
   clearSuggestions();
@@ -410,25 +541,7 @@ $("room-guess").addEventListener("input", () => {
       if (version !== searchRequest || state.round?.phase !== "guessing")
         return;
       suggestions = data.tracks;
-      suggestions.forEach((song, i) => {
-        const button = document.createElement("button"),
-          title = document.createElement("strong"),
-          artist = document.createElement("span");
-        button.type = "button";
-        button.id = `room-option-${i}`;
-        button.setAttribute("role", "option");
-        button.setAttribute("aria-selected", "false");
-        title.textContent = song.title;
-        artist.textContent = song.artist;
-        button.append(title, artist);
-        button.addEventListener("click", () => guess(song));
-        $("room-suggestions").append(button);
-      });
-      $("room-suggestions").hidden = !suggestions.length;
-      $("room-guess").setAttribute(
-        "aria-expanded",
-        String(!!suggestions.length),
-      );
+      renderSuggestions();
     } catch (e) {
       if (e.name !== "AbortError" && version === searchRequest)
         $("guess-feedback").textContent =
@@ -440,14 +553,19 @@ $("room-guess").addEventListener("keydown", (event) => {
   if (event.key === "Escape") clearSuggestions();
   if (["ArrowDown", "ArrowUp"].includes(event.key) && suggestions.length) {
     event.preventDefault();
-    suggestionIndex =
-      (suggestionIndex +
-        (event.key === "ArrowDown" ? 1 : -1) +
-        suggestions.length) %
-      suggestions.length;
+    suggestionIndex = nextEnabledSuggestion(
+      suggestions,
+      suggestionIndex,
+      event.key === "ArrowDown" ? 1 : -1,
+      (song) => wasGuessedWrong(state.wrongGuesses, song),
+    );
     [...$("room-suggestions").children].forEach((el, i) =>
       el.setAttribute("aria-selected", String(i === suggestionIndex)),
     );
+    if (suggestionIndex < 0) {
+      $("room-guess").removeAttribute("aria-activedescendant");
+      return;
+    }
     $("room-guess").setAttribute(
       "aria-activedescendant",
       `room-option-${suggestionIndex}`,
@@ -490,6 +608,7 @@ $("copy-invite").addEventListener("click", async () => {
 });
 $("leave-room").addEventListener("click", () => {
   stopped = true;
+  pruneMedia();
   send("leave");
   sessionStorage.removeItem(`beatguessr:room:${code}`);
   player.stop();

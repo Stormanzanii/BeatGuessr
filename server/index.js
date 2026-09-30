@@ -3,7 +3,13 @@ import { readFile, writeFile, mkdir, rename } from "node:fs/promises";
 import { resolve, extname, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { genres, filterCatalog, mergeSongs } from "./catalog.js";
-import { resolveSong, media, fetchAudio, searchSongs } from "./providers.js";
+import {
+  resolveSong,
+  media,
+  fetchAudio,
+  searchSongs,
+  fetchArtwork,
+} from "./providers.js";
 import { spotifyPlaylistId, parseSpotifyEmbed, parseCSV } from "./playlists.js";
 import { WebSocketServer } from "ws";
 import { LobbyHub } from "./lobbies.js";
@@ -99,11 +105,15 @@ const types = {
 
 export const lobbies = new LobbyHub(async (seed) => {
   let track = await resolveSong(seed);
+  const prepare = async (song) => {
+    const artwork = fetchArtwork(song).catch(() => null);
+    return { track: song, audio: await audioFor(song), artwork };
+  };
   try {
-    return { track, audio: await audioFor(track) };
+    return await prepare(track);
   } catch {
     track = await resolveSong(seed, track.source);
-    return { track, audio: await audioFor(track) };
+    return prepare(track);
   }
 });
 function selectedPool(owner, sources) {
@@ -142,11 +152,12 @@ export const server = createServer(async (req, res) => {
         input.name,
         selectedPool(owner, input.sources),
         owner,
+        { randomStart: input.randomStart },
       );
       return json(res, 201, { code: room.code, token: player.token });
     }
     const lobbyRoute =
-      /^\/api\/lobbies\/([A-Z0-9]{6})\/(audio|suggestions)(?:\/([^/]+))?$/.exec(
+      /^\/api\/lobbies\/([A-Z0-9]{6})\/(audio|artwork|suggestions)(?:\/([^/]+))?$/.exec(
         url.pathname,
       );
     if (req.method === "GET" && lobbyRoute) {
@@ -168,13 +179,25 @@ export const server = createServer(async (req, res) => {
           ),
         });
       }
-      if (!room.round?.audio || room.round.id !== lobbyRoute[3])
+      const asset =
+        room.round?.id === lobbyRoute[3]
+          ? room.round
+          : room.preload?.id === lobbyRoute[3]
+            ? room.preload.asset
+            : null;
+      const content =
+        lobbyRoute[2] === "artwork" ? await asset?.artwork : asset?.audio;
+      if (!content && lobbyRoute[2] === "artwork") {
+        res.writeHead(204, { "Cache-Control": "no-store" });
+        return res.end();
+      }
+      if (!content)
         return json(res, 404, { error: "Round audio is no longer available." });
       res.writeHead(200, {
-        "Content-Type": room.round.audio.type,
+        "Content-Type": content.type,
         "Cache-Control": "private, no-store",
       });
-      return res.end(room.round.audio.bytes);
+      return res.end(content.bytes);
     }
     if (req.method === "GET" && url.pathname === "/api/search") {
       const query = (url.searchParams.get("q") || "").trim();

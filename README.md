@@ -81,6 +81,12 @@ Open Sources and check one or more collections. Press Apply & new song to shuffl
 
 Revealing a song puts the album artwork on the centre record, with the title, artist, album/year, source, and listening links underneath. Every reveal automatically plays a 30-second snippet, including rounds nobody solved. The record spins during playback. Shorter previews or local files play their available duration. Use the play button to stop or replay the snippet; Next song stops it immediately. A late random starting point shifts back when needed to leave room for the full snippet.
 
+While you play, the next song's audio is downloaded and decoded, and artwork loads ahead of the reveal. Solo mode cancels old preloads when you change the collection or filters. Each lobby client holds only the current and upcoming round's media; it reuses the prepared audio when the host starts the next round. Track titles remain withheld from lobby clients until the reveal.
+
+**Random starting point** persists across refreshes and applies when a prepared song becomes the active round. A readout shows where the guessing clips start. The point stays the same across replays and longer clips within a round. It randomizes within the available preview (or your full local file), not the entire Spotify song. Audio of at least 16 seconds leaves room for all five clip lengths; shorter previews still randomize, with the play button showing the shorter available duration. The 30-second reveal may start earlier to fit. Lobby hosts can enable random starts when creating a room; everyone shares the same point.
+
+Incorrectly guessed songs remain in the search dropdown, greyed out with an **Already guessed · incorrect** label. Clicking and keyboard selection skip them. The marks reset each round. In lobbies, each player sees only their own incorrect guesses, and those marks survive reconnecting.
+
 ## Play with friends
 
 Open **Play with friends**, enter a nickname, choose imported playlists, and create a room. Send **Copy invite** to your friends or share the six-character room code. Up to 16 players can join, including the host. Each player clicks Join to enable browser audio.
@@ -187,3 +193,5 @@ npm run test:browser
 Keep the server running for browser tests. They use real provider audio and create/delete their own CSV test playlists. Checks cover all five clip schedules, skip and guess progression, correct-answer confetti, combined playlist deduplication, source checkboxes, year/genre filters, aligned desktop panels, mobile overflow, and browser errors. Screenshots are written to `test-results/`. Provider availability can affect the live tests.
 
 `npm run test:lobby` starts its own server with temporary storage and deterministic audio, then opens four independent browser sessions. It checks private imports, joining, host permissions, shared playback timestamps, votes, scores, solved and unsolved 30-second reveals, host transfer, rejoining, and mobile layout. It requires Playwright Chromium but no running app or music-provider connection.
+
+It also checks audio/artwork preloading and random-start persistence across refreshes and prepared rounds. To run the same checks in Firefox, install it with `npx playwright install firefox` and set `BEATGUESSR_TEST_BROWSER=firefox` for the test command.

@@ -2,7 +2,53 @@ import { matchScore } from "./matching.js";
 
 const metadataCache = new Map();
 const inflight = new Map();
+const artworkCache = new Map();
 export const media = new Map();
+export async function fetchArtwork(song) {
+  if (!song.cover) return null;
+  if (artworkCache.has(song.cover)) return artworkCache.get(song.cover);
+  let address = song.cover;
+  for (let hop = 0; hop < 4; hop++) {
+    const url = new URL(address);
+    if (
+      url.protocol !== "https:" ||
+      url.username ||
+      url.password ||
+      (url.port && url.port !== "443") ||
+      ![".dzcdn.net", ".mzstatic.com"].some((host) =>
+        url.hostname.endsWith(host),
+      )
+    )
+      return null;
+    const response = await fetch(url, {
+      redirect: "manual",
+      signal: AbortSignal.timeout(6000),
+    });
+    if ([301, 302, 303, 307, 308].includes(response.status)) {
+      address = new URL(response.headers.get("location"), address).href;
+      await response.body?.cancel();
+      continue;
+    }
+    const type = response.headers.get("content-type") || "";
+    if (!response.ok || !/^image\/(jpeg|png|webp|avif)(;|$)/i.test(type)) {
+      await response.body?.cancel();
+      return null;
+    }
+    const chunks = [];
+    let length = 0;
+    for await (const chunk of response.body) {
+      length += chunk.length;
+      if (length > 3 * 1024 * 1024) return null;
+      chunks.push(chunk);
+    }
+    const image = { bytes: Buffer.concat(chunks), type };
+    artworkCache.set(song.cover, image);
+    while (artworkCache.size > 30)
+      artworkCache.delete(artworkCache.keys().next().value);
+    return image;
+  }
+  return null;
+}
 
 export async function getJSON(url) {
   const response = await fetch(url, {

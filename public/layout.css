@@ -341,6 +341,33 @@ input[type="text"] {
 .suggestions {
   background: #252d20;
   border-color: #526141;
+  max-height: min(360px, 45vh);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.suggestions .suggestion-title {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  color: inherit;
+  font-size: inherit;
+  min-width: 0;
+}
+.suggestions button.guessed-wrong,
+.suggestions button.guessed-wrong:hover {
+  background: #292b25;
+  color: #a0a397;
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+.suggestions button.guessed-wrong strong {
+  text-decoration: line-through;
+  text-decoration-color: #cf8b80;
+}
+.suggestions .guess-status {
+  color: #ddaa9d;
+  font-size: 10px;
 }
 .suggestions button:hover,
 .suggestions button[aria-selected="true"] {
