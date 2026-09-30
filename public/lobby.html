@@ -24,8 +24,8 @@
         <div class="eyebrow">YOUR MUSIC. YOUR PEOPLE.</div>
         <h1>Bring the whole room.</h1>
         <p class="muted">
-          One host runs the music. Everyone guesses. Vote together for a longer
-          clip.
+          Replay clips at your own pace. Everyone guesses. Vote together for a
+          longer clip.
         </p>
         <label class="field-label" for="nickname">Your nickname</label
         ><input
@@ -48,7 +48,7 @@
           <section>
             <h2>Host a room</h2>
             <p class="muted small">
-              Choose the playlists everyone will guess from. Up to 16 players.
+              Choose Popular or your imported playlists. Up to 16 players.
             </p>
             <div id="lobby-sources" class="lobby-sources"></div>
             <div class="lobby-import">
@@ -111,9 +111,20 @@
           <button id="enable-audio" class="button outlined" hidden>
             Enable audio
           </button>
+          <div class="player-controls">
+            <button id="play-clip" class="button primary" disabled>
+              Play clip
+            </button>
+            <span class="muted small">Plays only for you</span>
+          </div>
+          <p id="audio-start-notice" class="muted small">
+            Audio may take a moment to start after pressing Play clip.
+          </p>
           <div id="host-controls" class="host-controls" hidden>
-            <button id="host-play" class="button primary">Play clip</button
-            ><button id="host-stop" class="button outlined">Stop</button
+            <button id="host-play" class="button outlined">
+              Play for everyone</button
+            ><button id="host-stop" class="button outlined">
+              Stop for everyone</button
             ><button id="host-skip" class="button outlined">Longer clip</button
             ><button id="host-reveal" class="text-button">Reveal answer</button
             ><button id="host-next" class="button primary">Start round</button>
@@ -142,6 +153,13 @@
           <button id="vote-skip" class="button outlined">
             Vote for longer clip
           </button>
+          <p
+            id="skip-countdown"
+            class="skip-countdown"
+            role="timer"
+            aria-live="off"
+            hidden
+          ></p>
         </section>
         <aside class="panel room-sidebar">
           <div class="eyebrow">THE LOBBY</div>
@@ -163,8 +181,8 @@
           </div>
           <button id="leave-room" class="button outlined">Leave room</button>
           <p class="muted small">
-            The host controls playback. A majority of players still guessing can
-            vote for a longer clip.
+            Play Clip replays just for you. Everyone must vote to start a
+            30-second countdown to the next clip. Keep guessing until it ends.
           </p>
         </aside>
       </div>

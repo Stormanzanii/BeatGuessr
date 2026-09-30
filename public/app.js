@@ -30,15 +30,17 @@ const settings = readStored("beatguessr:settings", {});
 const state = {
   pool: [],
   playlists: [],
+  builtIns: [],
   local: [],
   track: null,
   stage: 0,
+  continueClip: false,
   done: false,
   won: false,
   randomStart: settings.randomStart === true,
   selectedSources: Array.isArray(settings.sources)
     ? settings.sources
-    : [settings.source].filter(Boolean),
+    : [settings.source || "curated"],
   loading: true,
   round: 0,
   request: 0,
@@ -170,19 +172,24 @@ function playbackLabel(playing = player.playing) {
     : Infinity;
   const seconds =
     Math.round(Math.min(CLIP_LENGTHS[state.stage], available) * 1000) / 1000;
-  return `Play ${seconds}s clip`;
+  return state.continueClip
+    ? `Continue to ${seconds}s`
+    : `Play ${seconds}s clip`;
 }
 function updateRandomStartHint() {
   $("random-start").checked = state.randomStart;
   const hint = $("random-start-hint");
   if (!state.randomStart)
-    hint.textContent = "Clips start at the beginning of the available audio.";
+    hint.textContent =
+      state.track && !state.loading && player.offset > 0
+        ? `Opening silence skipped: starts ${player.offset.toFixed(2)}s into the audio.`
+        : "Clips start at the first audible point.";
   else if (!state.track || state.loading)
     hint.textContent = "A new starting point is chosen each round.";
   else if (state.done)
     hint.textContent =
       "The reveal plays up to 30s, so it may start earlier than the guessing clips.";
-  else if (!player.offset)
+  else if (player.buffer.duration <= 0.1)
     hint.textContent = "This audio is too short to randomize.";
   else
     hint.textContent = `This round starts ${player.offset.toFixed(player.offset < 1 ? 3 : 1)}s into ${state.track.origin === "local" ? "the song" : "the available preview"}.`;
@@ -210,6 +217,7 @@ function setLoading(loading) {
   updateRandomStartHint();
 }
 function setStage(index) {
+  state.continueClip = index > state.stage && !!state.track;
   player.stop();
   state.stage = index;
   document.querySelectorAll("[data-stage]").forEach((button, i) => {
@@ -300,9 +308,10 @@ function showReveal(won) {
   $("reveal-cover").onerror = () => {
     $("record-art").hidden = true;
   };
-  if (song.cover && $("reveal-cover").getAttribute("src") !== song.cover)
-    $("reveal-cover").src = song.cover;
-  else $("reveal-cover").removeAttribute("src");
+  if (song.cover) {
+    if ($("reveal-cover").getAttribute("src") !== song.cover)
+      $("reveal-cover").src = song.cover;
+  } else $("reveal-cover").removeAttribute("src");
   $("reveal-links").replaceChildren();
   for (const [href, label] of [
     [song.listenUrl, `Listen on ${song.source} ↗`],
@@ -424,6 +433,7 @@ function populateGenres(genres, selected = "All") {
 }
 function sourceOptions() {
   return [
+    ...state.builtIns,
     ...state.playlists,
     { id: "local", name: "Local audio", count: state.local.length },
   ];
@@ -440,10 +450,13 @@ function updateSourceLabel() {
 async function refreshSources(selected = state.selectedSources) {
   const data = await api("/api/playlists");
   state.playlists = data.playlists;
+  state.builtIns = data.builtIns || [];
   const options = sourceOptions();
   state.selectedSources = (
     Array.isArray(selected) ? selected : [selected]
   ).filter((id) => options.some((s) => s.id === id));
+  if (!state.selectedSources.length && state.builtIns.length)
+    state.selectedSources = ["curated"];
   $("source-dropdown").replaceChildren();
   for (const source of options) {
     const label = document.createElement("label");
@@ -649,6 +662,10 @@ async function play() {
         Math.max(0, player.buffer.duration - 30),
       );
       await player.play(30, { offset });
+    } else if (state.continueClip) {
+      const clip = player.continuation(CLIP_LENGTHS[state.stage]);
+      state.continueClip = false;
+      await player.play(clip.seconds, { offset: clip.offset });
     } else await player.play(CLIP_LENGTHS[state.stage]);
   } catch (error) {
     message(error.message, "error");
@@ -963,7 +980,7 @@ async function init() {
   $("random-start").checked = state.randomStart;
   $("auto-play").checked = settings.autoPlay ?? true;
   $("confetti-amount").value = confettiMultiplier(
-    settings.confettiMultiplier ?? 6,
+    settings.confettiMultiplier ?? 1,
   );
   updateConfettiSetting();
   try {

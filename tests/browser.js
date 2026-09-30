@@ -75,6 +75,12 @@ try {
     await page.locator(`[data-stage="${index}"]`).click();
     await page.locator("#play-button").click();
     await page.waitForFunction(() => window.beatguessr.player.playing);
+    if (index > 0) {
+      // Advancing continues the previous clip; an explicit replay uses the full length.
+      await page.locator("#play-button").click();
+      await page.locator("#play-button").click();
+      await page.waitForFunction(() => beatguessr.player.playing);
+    }
     const schedule = await page.evaluate(() => beatguessr.player.lastSchedule);
     assert.equal(schedule.seconds, seconds);
     assert.ok(Math.abs(schedule.endsAt - schedule.at - seconds) < 1e-8);
@@ -116,7 +122,7 @@ try {
   );
   assert.equal(
     await page.locator("canvas.confetti").getAttribute("data-particles"),
-    "9000",
+    "1500",
   );
   await page.waitForTimeout(650);
   await page.screenshot({ path: "test-results/reveal.png", fullPage: true });
@@ -167,7 +173,7 @@ try {
   console.log("Combined genre and decade filters:", filtered.length, "songs.");
 
   await page.locator("#source-button").click();
-  assert.equal(await page.locator('[data-source="curated"]').count(), 0);
+  assert.equal(await page.locator('[data-source="curated"]').count(), 1);
   await page.locator(`[data-source="${fixtureId}"]`).uncheck();
 
   await page.locator("#import-button").click();
@@ -276,6 +282,7 @@ try {
       .map((p) => p.id),
   )) {
     await page.locator(`[data-remove="${id}"]`).click();
+    await page.locator(`[data-remove="${id}"]`).waitFor({ state: "detached" });
     await page.waitForFunction(() => !beatguessr.state.loading, null, {
       timeout: 120000,
     });
@@ -353,13 +360,16 @@ try {
   );
   await page.evaluate(() => {
     const { player } = beatguessr;
-    player.setBuffer(
-      player.context.createBuffer(
-        1,
-        player.context.sampleRate * 45,
-        player.context.sampleRate,
-      ),
+    const buffer = player.context.createBuffer(
+      1,
+      player.context.sampleRate * 45,
+      player.context.sampleRate,
     );
+    const samples = buffer.getChannelData(0);
+    for (let frame = 0; frame < samples.length; frame++)
+      samples[frame] =
+        Math.sin((frame / buffer.sampleRate) * Math.PI * 2 * 440) * 0.2;
+    player.setBuffer(buffer);
     player.offset = 35;
   });
   await page.locator("#guess").fill("Fixture Song");

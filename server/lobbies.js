@@ -128,8 +128,10 @@ export class LobbyHub {
     room.players.delete(player.id);
     room.round?.votes.delete(player.id);
     if (room.hostId === player.id) this.transferHost(room);
-    if (!room.players.size) this.rooms.delete(room.code);
-    else {
+    if (!room.players.size) {
+      this.cancelSkip(room);
+      this.rooms.delete(room.code);
+    } else {
       this.settleVotes(room);
       this.broadcast(room);
     }
@@ -138,16 +140,15 @@ export class LobbyHub {
     const next = [...room.players.values()].find((p) => p.connected);
     if (next) {
       room.hostId = next.id;
-      if (room.round && next.duration) this.setTiming(room, next.duration);
+      if (room.round && next.duration)
+        this.setTiming(room, next.duration, next.startOffset);
       room.message = `${next.name} is now the host.`;
     }
     this.broadcast(room);
   }
   snapshot(room, player) {
     const round = room.round;
-    const voters = [...room.players.values()].filter(
-      (p) => p.connected && !round?.solved.has(p.id),
-    );
+    const voters = [...room.players.values()].filter((p) => p.connected);
     return {
       code: room.code,
       you: player.id,
@@ -182,11 +183,13 @@ export class LobbyHub {
                 ) * 1000,
               ) / 1000,
             offset: round.offset,
+            timingReady: !!round.timingReady,
             artwork: !!round.track?.cover,
             playback: round.playback,
             votes: round.votes.size,
-            votesNeeded: Math.max(1, Math.floor(voters.length / 2) + 1),
+            votesNeeded: Math.max(1, voters.length),
             voted: round.votes.has(player.id),
+            skipAt: round.skipAt ?? null,
             track:
               round.phase === "revealed"
                 ? {
@@ -213,12 +216,13 @@ export class LobbyHub {
       if (player.connected)
         player.send?.({ type: "state", state: this.snapshot(room, player) });
   }
-  play(room, seconds) {
+  play(room, seconds, continueFromPrevious = false) {
     const round = room.round;
     round.playback = {
       id: randomUUID(),
       startsAt: this.now() + 1000,
       seconds,
+      continueFromPrevious,
       offset:
         seconds === 30
           ? Math.min(
@@ -228,18 +232,27 @@ export class LobbyHub {
           : round.offset || 0,
     };
   }
-  setTiming(room, duration) {
+  setTiming(room, duration, startOffset) {
     room.round.duration = duration;
-    if (room.round.offset === null)
-      room.round.offset = randomClipStart(duration);
+    if (
+      !room.round.timingReady &&
+      Number.isFinite(startOffset) &&
+      startOffset >= 0 &&
+      startOffset <= Math.max(0, duration - 0.1)
+    )
+      room.round.offset = startOffset;
+    else if (room.round.offset === null)
+      room.round.offset = room.randomStart ? randomClipStart(duration) : 0;
     else
       room.round.offset = Math.min(
         room.round.offset,
         Math.max(0, duration - 0.1),
       );
+    room.round.timingReady = true;
   }
   reveal(room) {
     if (!room.round || room.round.phase !== "guessing") return;
+    this.cancelSkip(room);
     room.round.phase = "revealed";
     room.round.votes.clear();
     this.play(room, 30);
@@ -247,11 +260,12 @@ export class LobbyHub {
   }
   skip(room) {
     if (room.randomStart && room.round.offset === null) return;
+    this.cancelSkip(room);
     if (room.round.stage === 4) this.reveal(room);
     else {
       room.round.stage++;
       room.round.votes.clear();
-      this.play(room, lengths[room.round.stage]);
+      this.play(room, lengths[room.round.stage], true);
       room.message = "A longer clip is ready.";
     }
   }
@@ -260,13 +274,41 @@ export class LobbyHub {
     const active = [...room.players.values()].filter(
       (player) => player.connected,
     );
-    if (!active.length) return;
+    if (!active.length) {
+      this.cancelSkip(room);
+      return;
+    }
     const unsolved = active.filter(
       (player) => !room.round.solved.has(player.id),
     );
     if (!unsolved.length) this.reveal(room);
-    else if (room.round.votes.size >= Math.floor(unsolved.length / 2) + 1)
+    else if (room.round.votes.size >= active.length)
+      this.startSkipCountdown(room);
+  }
+  cancelSkip(room) {
+    if (!room.round) return;
+    clearTimeout(room.round.skipTimer);
+    room.round.skipTimer = null;
+    room.round.skipAt = null;
+  }
+  startSkipCountdown(room) {
+    const round = room.round;
+    if (round.skipAt != null || (room.randomStart && round.offset === null))
+      return;
+    round.skipAt = this.now() + 30000;
+    const stage = round.stage;
+    round.skipTimer = setTimeout(() => {
+      if (
+        this.rooms.get(room.code) !== room ||
+        room.round !== round ||
+        round.phase !== "guessing" ||
+        round.stage !== stage
+      )
+        return;
       this.skip(room);
+      this.broadcast(room);
+    }, 30000);
+    round.skipTimer.unref?.();
   }
   preload(room) {
     if (room.preload) return room.preload;
@@ -305,6 +347,7 @@ export class LobbyHub {
     return queued;
   }
   async next(room) {
+    this.cancelSkip(room);
     const queued = this.preload(room);
     room.preload = null;
     const round = {
@@ -315,9 +358,12 @@ export class LobbyHub {
       solved: new Set(),
       wrong: new Map(),
       playback: null,
+      skipAt: null,
+      skipTimer: null,
       track: null,
       audio: null,
       offset: room.randomStart ? null : 0,
+      timingReady: false,
     };
     room.round = round;
     room.roundNumber++;
@@ -325,6 +371,7 @@ export class LobbyHub {
     for (const player of room.players.values()) {
       player.ready = false;
       player.duration = null;
+      player.startOffset = null;
       player.lastGuess = -Infinity;
     }
     this.broadcast(room);
@@ -335,7 +382,7 @@ export class LobbyHub {
       round.phase = "guessing";
       room.used.add(loaded.seedId);
       room.message =
-        "Audio is loading for everyone. The host controls playback.";
+        "Audio is loading. Each player can replay the current clip.";
       this.broadcast(room);
       this.preload(room);
       return;
@@ -379,7 +426,9 @@ export class LobbyHub {
         action.duration <= 900
       ) {
         player.duration = action.duration;
-        if (player.id === room.hostId) this.setTiming(room, action.duration);
+        player.startOffset = action.startOffset;
+        if (player.id === room.hostId)
+          this.setTiming(room, action.duration, action.startOffset);
       }
       if (
         round.phase === "guessing" &&
@@ -399,16 +448,13 @@ export class LobbyHub {
       if ([...room.players.values()].some((p) => p.connected && !p.ready))
         fail("Wait for everyone to load the audio.");
       this.play(room, round.phase === "revealed" ? 30 : lengths[round.stage]);
-    } else if (action.type === "stop") round.playback = null;
+    } else if (action.type === "stop")
+      round.playback = { id: randomUUID(), stopped: true };
     else if (action.type === "reveal") this.reveal(room);
     else if (round.phase !== "guessing") fail("This round is finished.");
     else if (action.type === "skip") this.skip(room);
     else if (action.type === "vote") {
-      if (round.solved.has(player.id))
-        fail("You already identified this song.");
       round.votes.add(player.id);
-      if (round.votes.size >= this.snapshot(room, player).round.votesNeeded)
-        this.skip(room);
     } else if (action.type === "guess") {
       if (round.solved.has(player.id))
         fail("You already identified this song.");
@@ -450,7 +496,6 @@ export class LobbyHub {
             .includes(normalize(String(action.artist))));
       if (correct) {
         round.solved.add(player.id);
-        round.votes.delete(player.id);
         player.score += [100, 80, 60, 40, 20][round.stage];
       } else round.wrong.set(player.id, [...wrong, guess]);
       player.send?.({
@@ -470,6 +515,7 @@ export class LobbyHub {
   prune() {
     for (const [code, room] of this.rooms)
       if (this.now() - room.updated > 2 * 60 * 60 * 1000) {
+        this.cancelSkip(room);
         for (const player of room.players.values())
           player.send?.({
             type: "error",

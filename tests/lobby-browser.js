@@ -29,6 +29,13 @@ wav.writeUInt16LE(2, 32);
 wav.writeUInt16LE(16, 34);
 wav.write("data", 36);
 wav.writeUInt32LE(samples * 2, 40);
+for (let frame = 0; frame < samples; frame++)
+  wav.writeInt16LE(
+    frame < 4000 || (frame >= 64000 && frame < 192000)
+      ? 0
+      : Math.round(Math.sin((frame / 16000) * Math.PI * 2 * 440) * 10000),
+    44 + frame * 2,
+  );
 lobbies.loadTrack = async (seed) => ({
   track: {
     ...seed,
@@ -67,6 +74,24 @@ coverPNG = Buffer.from(
 const errors = [];
 for (const page of pages) page.on("pageerror", (e) => errors.push(e.message));
 try {
+  const builtIns = await (
+    await contexts[1].request.get(`${base}/api/playlists`)
+  ).json();
+  assert.equal(builtIns.builtIns[0].name, "Popular");
+  const popularCatalog = await (
+    await contexts[1].request.get(`${base}/api/catalog?sources=curated`)
+  ).json();
+  assert.ok(popularCatalog.tracks.length > 100);
+  assert.equal(popularCatalog.tracks[0].poolSources[0].name, "Popular");
+  const popularRoom = await contexts[1].request.post(`${base}/api/lobbies`, {
+    data: { name: "Popular host", sources: ["curated"] },
+  });
+  assert.equal(popularRoom.status(), 201);
+  const createdPopular = await popularRoom.json();
+  assert.equal(
+    lobbies.get(createdPopular.code).pool.length,
+    popularCatalog.total,
+  );
   const response = await contexts[0].request.post(
     `${base}/api/playlists/import`,
     {
@@ -98,6 +123,11 @@ try {
   assert.equal(forbidden.status(), 403);
   const [host, ...guests] = pages;
   await host.goto(`${base}/lobby`);
+  assert.equal(
+    await host.locator('#lobby-sources input[value="curated"]').isChecked(),
+    true,
+  );
+  await host.locator('#lobby-sources input[value="curated"]').uncheck();
   await host.locator("#nickname").fill("Host");
   await host.locator("#room-random-start").check();
   await host.locator(`#lobby-sources input[value="${playlist.id}"]`).check();
@@ -142,6 +172,65 @@ try {
         redundantLoads++;
     });
   assert.equal(await guests[0].locator("#host-controls").isVisible(), false);
+  for (const page of pages) {
+    const others = pages.filter((other) => other !== page);
+    const before = await Promise.all(
+      others.map((other) =>
+        other.evaluate(() => beatguessrLobby.player.lastSchedule?.at ?? null),
+      ),
+    );
+    assert.equal(await page.locator("#play-clip").isEnabled(), true);
+    await page.locator("#play-clip").click();
+    await page.waitForFunction(() => !!beatguessrLobby.player.lastSchedule);
+    assert.equal(
+      await page.evaluate(() => beatguessrLobby.player.lastSchedule.offset),
+      await page.evaluate(() => beatguessrLobby.state.round.offset),
+    );
+    assert.ok(
+      await page.evaluate(() => {
+        const player = beatguessrLobby.player,
+          buffer = player.buffer;
+        const start = Math.floor(
+          player.lastSchedule.offset * buffer.sampleRate,
+        );
+        const samples = buffer
+          .getChannelData(0)
+          .slice(start, start + Math.floor(buffer.sampleRate * 0.1));
+        return (
+          Math.sqrt(
+            samples.reduce((sum, value) => sum + value * value, 0) /
+              samples.length,
+          ) > 0.02
+        );
+      }),
+      "Every player's 0.1-second clip contains audible waveform energy",
+    );
+    const generation = await page.evaluate(
+      () => beatguessrLobby.player.generation,
+    );
+    const marker = `Personal replay ${generation} ${pages.indexOf(page)}`;
+    lobbies.get(code).message = marker;
+    lobbies.broadcast(lobbies.get(code));
+    await page.waitForFunction(
+      (message) => beatguessrLobby.state.message === message,
+      marker,
+    );
+    assert.equal(
+      await page.evaluate(() => beatguessrLobby.player.generation),
+      generation,
+      "State updates do not interrupt personal replays",
+    );
+    assert.deepEqual(
+      await Promise.all(
+        others.map((other) =>
+          other.evaluate(() => beatguessrLobby.player.lastSchedule?.at ?? null),
+        ),
+      ),
+      before,
+      "A personal replay never starts audio for others",
+    );
+    await page.waitForFunction(() => !beatguessrLobby.player.playing);
+  }
   await host.locator("#host-play").click();
   await Promise.all(
     pages.map((page) =>
@@ -233,10 +322,72 @@ try {
       ).solved,
   );
   assert.equal(await host.locator("#answer").isVisible(), false);
-  assert.equal(await guests[0].locator("#vote-skip").isDisabled(), true);
+  assert.equal(await guests[0].locator("#vote-skip").isEnabled(), true);
   await host.locator("#vote-skip").click();
   await guests[1].locator("#vote-skip").click();
-  await host.waitForFunction(() => beatguessrLobby.state.round.stage === 1);
+  await guests[2].locator("#vote-skip").click();
+  await host.waitForFunction(() => beatguessrLobby.state.round.votes === 3);
+  assert.equal(
+    await host.evaluate(() => beatguessrLobby.state.round.skipAt),
+    null,
+  );
+  await guests[0].locator("#vote-skip").click();
+  await Promise.all(
+    pages.map((page) => page.locator("#skip-countdown").waitFor()),
+  );
+  const deadlines = await Promise.all(
+    pages.map((page) =>
+      page.evaluate(() => beatguessrLobby.state.round.skipAt),
+    ),
+  );
+  assert.ok(deadlines.every((deadline) => deadline === deadlines[0]));
+  assert.equal(await host.evaluate(() => beatguessrLobby.state.round.stage), 0);
+  assert.match(
+    await host.locator("#skip-countdown").textContent(),
+    /Longer clip in 30s/,
+  );
+  await mkdir("test-results", { recursive: true });
+  await host.screenshot({
+    path: "test-results/lobby-countdown.png",
+    fullPage: true,
+  });
+  await guests[1].locator("#play-clip").click();
+  await host.waitForFunction(
+    () => beatguessrLobby.state.round.stage === 1,
+    null,
+    { timeout: 40000 },
+  );
+  assert.equal(await host.locator("#skip-countdown").isVisible(), false);
+  await Promise.all(
+    pages.map((page) =>
+      page.waitForFunction(
+        () =>
+          Math.abs(beatguessrLobby.player.lastSchedule.seconds - 0.4) < 1e-6,
+      ),
+    ),
+  );
+  for (const page of pages)
+    assert.ok(
+      await page.evaluate(
+        () =>
+          Math.abs(
+            beatguessrLobby.player.lastSchedule.offset -
+              beatguessrLobby.state.round.offset -
+              0.1,
+          ) < 1e-6,
+      ),
+      "A longer clip continues from the previous ending",
+    );
+  await guests[1].locator("#play-clip").click();
+  await guests[1].locator("#play-clip").click();
+  await guests[1].waitForFunction(
+    () => beatguessrLobby.player.lastSchedule.seconds === 0.5,
+  );
+  assert.equal(
+    await guests[1].evaluate(() => beatguessrLobby.player.lastSchedule.offset),
+    await guests[1].evaluate(() => beatguessrLobby.state.round.offset),
+    "An explicit replay restarts at the round's starting point",
+  );
   for (const page of [host, guests[1], guests[2]]) {
     await page.locator("#room-guess").fill("Test Song");
     await page.locator("#room-guess").press("Enter");
@@ -256,6 +407,15 @@ try {
   assert.deepEqual(scores, [80, 80, 80, 100]);
   await host.locator("#host-stop").click();
   await host.waitForFunction(() => !beatguessrLobby.player.playing);
+  await Promise.all(
+    pages.map((page) =>
+      page.waitForFunction(() => !beatguessrLobby.player.playing),
+    ),
+  );
+  await guests[1].locator("#play-clip").click();
+  await guests[1].waitForFunction(() => beatguessrLobby.player.playing);
+  await host.locator("#host-stop").click();
+  await guests[1].waitForFunction(() => !beatguessrLobby.player.playing);
   await mkdir("test-results", { recursive: true });
   await host.screenshot({
     path: "test-results/lobby-desktop.png",
@@ -387,7 +547,45 @@ try {
     "Solo downloads the next song before it is needed",
   );
   const firstArtReads = coverReads.get(firstId);
+  await host.locator("#play-button").click();
+  await host.waitForFunction(
+    () =>
+      beatguessr.player.lastSchedule?.seconds === 0.1 &&
+      !beatguessr.player.playing,
+  );
+  const soloStart = await host.evaluate(() => beatguessr.player.offset);
+  await host.locator("#skip-button").click();
+  await host.waitForFunction(
+    () => Math.abs(beatguessr.player.lastSchedule.seconds - 0.4) < 1e-6,
+  );
+  assert.ok(
+    Math.abs(
+      (await host.evaluate(() => beatguessr.player.lastSchedule.offset)) -
+        soloStart -
+        0.1,
+    ) < 1e-6,
+    "Solo advancing plays only the next portion",
+  );
+  await host.waitForFunction(() => !beatguessr.player.playing);
+  await host.locator("#play-button").click();
+  await host.waitForFunction(
+    () => beatguessr.player.lastSchedule.seconds === 0.5,
+  );
+  assert.equal(
+    await host.evaluate(() => beatguessr.player.lastSchedule.offset),
+    soloStart,
+    "Solo replay returns to the round's starting point",
+  );
   await host.locator("#give-up").click();
+  assert.equal(await host.locator("#record-art").isVisible(), true);
+  assert.ok(
+    await host
+      .locator("#reveal-cover")
+      .evaluate(
+        (image) => image.naturalWidth > 0 && !!image.getAttribute("src"),
+      ),
+    "The reveal retains the preloaded cover instead of clearing it",
+  );
   assert.equal(
     coverReads.get(firstId),
     firstArtReads,
@@ -443,7 +641,13 @@ try {
     () => !beatguessr.state.loading && beatguessr.state.track,
   );
   assert.equal(await host.locator("#random-start").isChecked(), false);
-  assert.equal(await host.evaluate(() => beatguessr.player.offset), 0);
+  assert.ok(
+    await host.evaluate(
+      () =>
+        beatguessr.player.offset >= 0.24 && beatguessr.player.offset <= 0.26,
+    ),
+    "Random off still skips the fixture's leading silence",
+  );
   const current = await host.evaluate(() => beatguessr.state.track);
   const incorrect = soloPool.find((song) => song.id !== current.id);
   await host.route("**/api/search?*", (route) =>
@@ -487,7 +691,7 @@ try {
   );
   assert.equal(errors.length, 0, errors.join("\n"));
   console.log(
-    "Four-browser lobby passed: private imports, host controls, shared clips, majority votes, scores, 30s reveals, host transfer, rejoin, mobile layout, and audio/artwork preloading in both solo and lobbies.",
+    "Four-browser lobby passed: personal and shared playback, unanimous votes with 30s countdown, scores, 30s reveals, reconnects, wrong guesses, and audio/artwork preloading.",
   );
 } finally {
   await browser.close();

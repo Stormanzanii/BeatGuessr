@@ -33,7 +33,10 @@ const celebrated = new Set();
 const mediaCache = new Map();
 const player = new ClipPlayer(
   (progress) => ($("room-progress").style.width = `${progress * 100}%`),
-  (playing) => $("lobby-record").classList.toggle("spinning", playing),
+  (playing) => {
+    $("lobby-record").classList.toggle("spinning", playing);
+    updatePersonalPlayback();
+  },
 );
 window.beatguessrLobby = {
   player,
@@ -67,21 +70,23 @@ async function request(path, options = {}) {
 }
 async function sources(selected) {
   const data = await request("/api/playlists");
+  const options = [...(data.builtIns || []), ...data.playlists];
+  let chosen = selected || settings.sources || [];
+  if (!chosen.some((id) => options.some((option) => option.id === id)))
+    chosen = ["curated"];
   $("lobby-sources").replaceChildren();
-  for (const playlist of data.playlists) {
+  for (const playlist of options) {
     const label = document.createElement("label"),
       input = document.createElement("input"),
       text = document.createElement("span");
     input.type = "checkbox";
     input.value = playlist.id;
-    input.checked = selected
-      ? selected.includes(playlist.id)
-      : (settings.sources || []).includes(playlist.id);
+    input.checked = chosen.includes(playlist.id);
     text.textContent = `${playlist.name} · ${playlist.count} songs`;
     label.append(input, text);
     $("lobby-sources").append(label);
   }
-  if (!data.playlists.length)
+  if (!options.length)
     $("lobby-sources").textContent =
       "Import a CSV or add a Spotify playlist in solo mode first.";
 }
@@ -143,7 +148,7 @@ function connect() {
       $("guess-feedback").classList.toggle("correct", data.correct);
       if (data.correct && !celebrated.has(state.round.id)) {
         celebrated.add(state.round.id);
-        celebrate(confettiMultiplier(settings.confettiMultiplier ?? 6));
+        celebrate(confettiMultiplier(settings.confettiMultiplier ?? 1));
       }
     } else if (data.type === "error") {
       error(data.message);
@@ -306,10 +311,11 @@ async function loadAudio(round) {
     const asset = warmMedia(round);
     const buffer = asset.buffer || (await asset.audio);
     if (requestId !== audioTask || state?.round?.id !== round.id) return;
-    player.setBuffer(buffer);
+    player.setBuffer(buffer, state.randomStart);
     if (asset.artworkURL) $("lobby-cover").src = asset.artworkURL;
     loadedRound = round.id;
     loadingRound = "";
+    updatePersonalPlayback();
     markReady();
     playScheduled();
   } catch (e) {
@@ -327,14 +333,26 @@ function markReady() {
     readySentForRound !== loadedRound
   ) {
     readySentForRound = loadedRound;
-    send("ready", { duration: player.buffer.duration });
+    send("ready", {
+      duration: player.buffer.duration,
+      startOffset: player.offset,
+    });
   }
 }
 function playScheduled() {
   const playback = state?.round?.playback;
   if (!playback) {
-    player.stop();
-    playbackId = "";
+    if (playbackId) {
+      playbackId = "";
+      player.stop();
+    }
+    return;
+  }
+  if (playback.stopped) {
+    if (playbackId !== playback.id) {
+      playbackId = playback.id;
+      player.stop();
+    }
     return;
   }
   if (loadedRound !== state.round.id || playbackId === playback.id) return;
@@ -348,13 +366,66 @@ function playScheduled() {
     seconds = playback.seconds - elapsed;
   if (seconds <= 0 || playback.offset + elapsed >= player.buffer.duration)
     return;
+  const clip = playback.continueFromPrevious
+    ? player.continuation(playback.seconds, playback.offset)
+    : { seconds, offset: playback.offset + elapsed };
   void player
-    .play(seconds, {
-      offset: playback.offset + elapsed,
+    .play(clip.seconds, {
+      offset: clip.offset,
       when: player.context.currentTime + Math.max(0, delay),
     })
     .catch((e) => error(e.message));
 }
+function updatePersonalPlayback() {
+  const round = state?.round;
+  $("play-clip").disabled =
+    !round ||
+    round.phase === "loading" ||
+    loadedRound !== round.id ||
+    round.offset == null ||
+    !round.timingReady;
+  $("play-clip").textContent = player.playing
+    ? "Stop clip"
+    : round?.phase === "revealed"
+      ? "Replay snippet"
+      : "Play clip";
+}
+async function playPersonalClip() {
+  if ($("play-clip").disabled) return;
+  if (player.playing) return player.stop();
+  const round = state.round;
+  try {
+    await unlock();
+    if (
+      state.round?.id !== round.id ||
+      state.round.stage !== round.stage ||
+      state.round.phase !== round.phase
+    )
+      return;
+    const revealed = round.phase === "revealed";
+    await player.play(revealed ? 30 : round.seconds, {
+      offset: revealed
+        ? Math.min(round.offset, Math.max(0, player.buffer.duration - 30))
+        : round.offset,
+    });
+  } catch (e) {
+    error(e.message);
+  }
+}
+function updateCountdown() {
+  const round = state?.round,
+    countdown = $("skip-countdown");
+  countdown.hidden = round?.phase !== "guessing" || round.skipAt == null;
+  if (countdown.hidden) return;
+  const seconds = Math.min(
+    30,
+    Math.max(0, Math.ceil((round.skipAt - Date.now() - serverOffset) / 1000)),
+  );
+  countdown.textContent = seconds
+    ? `${round.stage === 4 ? "Answer reveals" : "Longer clip"} in ${seconds}s · Keep guessing!`
+    : "Advancing…";
+}
+setInterval(updateCountdown, 250);
 function render() {
   const round = state.round,
     me = state.players.find((p) => p.id === state.you),
@@ -373,16 +444,19 @@ function render() {
   $("host-play").disabled =
     !playable || state.players.some((p) => p.connected && !p.ready);
   $("host-play").textContent =
-    round?.phase === "revealed" ? "Replay snippet" : "Play clip";
+    round?.phase === "revealed" ? "Replay for everyone" : "Play for everyone";
   $("host-skip").hidden = $("host-reveal").hidden =
     round?.phase === "revealed" || !round;
   const guessing = round?.phase === "guessing" && !me?.solved;
   $("room-guess").disabled = $("room-submit").disabled = !guessing;
   $("room-guess-form").hidden = round?.phase === "revealed";
-  $("vote-skip").disabled = !guessing || round.voted;
+  $("vote-skip").disabled =
+    round?.phase !== "guessing" || round.voted || round.skipAt != null;
   $("vote-skip").hidden = round?.phase !== "guessing";
   $("vote-skip").textContent = round
-    ? `${round.voted ? "Voted" : round.stage === 4 ? "Vote to reveal" : "Vote for longer clip"} · ${round.votes}/${round.votesNeeded}`
+    ? round.skipAt != null
+      ? "Skip scheduled"
+      : `${round.voted ? "Voted" : round.stage === 4 ? "Vote to reveal" : "Vote for longer clip"} · ${round.votes}/${round.votesNeeded}`
     : "Vote for longer clip";
   $("clip-status").textContent =
     round?.phase === "loading"
@@ -430,6 +504,8 @@ function render() {
     $("lobby-cover").hidden = true;
     $("lobby-cover").removeAttribute("src");
   }
+  updatePersonalPlayback();
+  updateCountdown();
   $("answer").hidden = round?.phase !== "revealed";
   if (round?.track) {
     $("guess-feedback").textContent = me?.solved
@@ -581,6 +657,7 @@ $("join-room").addEventListener("click", () => enter(false));
 for (const action of ["next", "play", "stop", "skip", "reveal"])
   $(`host-${action}`).addEventListener("click", () => send(action));
 $("vote-skip").addEventListener("click", () => send("vote"));
+$("play-clip").addEventListener("click", playPersonalClip);
 $("enable-audio").addEventListener("click", async () => {
   try {
     await unlock();

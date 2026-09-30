@@ -26,7 +26,7 @@ Open **http://localhost:3000**. Leave the terminal running while you play. Press
 
 If you downloaded a ZIP, extract it and open a terminal in the folder containing `package.json`, then run `npm ci` and `npm start`.
 
-By default the server listens on `127.0.0.1`, so it is accessible only on the computer running it. Import a Spotify playlist or CSV, or add local audio to start playing. The game uses your selected sources; there is no built-in popular-song pool or background catalog expansion. Personal playlists are not bundled with the repository. For online play, see [Deploy on Render](#deploy-on-render).
+By default the server listens on `127.0.0.1`, so it is accessible only on the computer running it. Start with the built-in Popular collection, import a Spotify playlist or CSV, or add local audio. Popular is available in solo and multiplayer and can be combined with imported playlists. Personal playlists are not bundled with the repository. For online play, see [Deploy on Render](#deploy-on-render).
 
 ### Use another port
 
@@ -75,7 +75,7 @@ Use `npm run dev` to restart the server automatically when server files change. 
 
 Press Play, then type a title or choose a suggestion. Suggestions combine the wider Deezer catalog, with Apple Music as a fallback, and matching songs from your selected sources. Exact playlist title matches appear first, including tracks missing from the external catalog. If external search is unavailable, matching playlist songs still appear and you can enter a title directly. Enter submits your guess. Skip, beside the textbox, advances through the clip lengths. At 15 seconds it reveals the answer. You can also choose a clip length directly.
 
-Correct answers animate the record and release confetti. The saved slider under Audio & celebration settings runs from 1× (1,500 pieces for two seconds) to 20× (30,000 pieces). Duration increases by two seconds per multiplier and caps at 12 seconds; the default is 6×. Reduced-motion preferences use a smaller, shorter celebration.
+Correct answers animate the record and release confetti. The saved slider under Audio & celebration settings runs from 1× (1,500 pieces for two seconds) to 20× (30,000 pieces). Duration increases by two seconds per multiplier and caps at 12 seconds; the default is 1×. Reduced-motion preferences use a smaller, shorter celebration.
 
 Open Sources and check one or more collections. Press Apply & new song to shuffle their combined pool. Overlapping songs are deduplicated, so the same song appearing in two playlists does not receive double the chance of selection. Genre and year controls are under Genre & release years. The app avoids recently served songs until the selected pool is exhausted.
 
@@ -87,15 +87,19 @@ While you play, the next song's audio is downloaded and decoded, and artwork loa
 
 Incorrectly guessed songs remain in the search dropdown, greyed out with an **Already guessed · incorrect** label. Clicking and keyboard selection skip them. The marks reset each round. In lobbies, each player sees only their own incorrect guesses, and those marks survive reconnecting.
 
+Waveform checks move the starting point past silence so the first 0.1-second clip contains sound. The same point is used for longer clips. Entirely silent or near-silent audio is rejected. In lobbies, the host's checked position is shared with everyone, including personal replays.
+
+Advancing a clip continues from where playback stopped, up to the new total length: after hearing 0.1s, advancing to 0.5s plays the next 0.4s. A replay restarts from the round's starting point. Multiplayer keeps each player's listening position separately.
+
 ## Play with friends
 
 Open **Play with friends**, enter a nickname, choose imported playlists, and create a room. Send **Copy invite** to your friends or share the six-character room code. Up to 16 players can join, including the host. Each player clicks Join to enable browser audio.
 
-The host starts rounds and controls playback, stopping, longer clips, and revealing the answer. Everyone guesses independently. Correct guesses earn 100 / 80 / 60 / 40 / 20 points at the five clip lengths; answers stay private until everyone connected solves or the host reveals. A majority of connected players still guessing can vote for a longer clip. At 15 seconds the next skip reveals the track. Every reveal plays up to 30 seconds, whether anyone solved it or not.
+Every player has a **Play clip** button that plays or stops audio only for them. The host also has controls to play or stop audio for everyone, start rounds, advance clips, and reveal the answer. Everyone guesses independently. Correct guesses earn 100 / 80 / 60 / 40 / 20 points at the five clip lengths; answers stay private until everyone connected solves or the host reveals. Every connected player must vote to start a shared **30-second countdown** before the next clip, including players who have already guessed correctly. Players can continue guessing and replaying during the countdown. At the final 15-second stage, the countdown reveals the answer instead. Refreshing, reconnecting, or additional votes do not restart the countdown. A host advance or everyone solving cancels it. Every reveal plays up to 30 seconds, whether anyone solved it or not.
 
 The server checks guesses and permissions. Clients preload the same audio and schedule playback using a shared timestamp, with clock-offset and late-arrival adjustment. Network and browser scheduling can still introduce small timing differences. A disconnected player can rejoin from the same tab with their score intact. The host has a 30-second reconnection grace period after a detected disconnect; controls then pass to another connected player. Leaving transfers controls immediately.
 
-Rooms expire after two hours without activity and are held in server memory. Lobbies use imported playlist previews; local audio remains a solo feature. Hosted imports belong to the browser that imported them, while invited room members can guess from the host's selected songs. Clearing browser cookies loses access to those hosted imports.
+Rooms expire after two hours without activity and are held in server memory. Lobbies use Popular or imported playlist previews; local audio remains a solo feature. Hosted imports belong to the browser that imported them, while invited room members can guess from the host's selected songs. Clearing browser cookies loses access to those hosted imports.
 
 ## Deploy on Render
 

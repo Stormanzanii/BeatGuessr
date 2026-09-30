@@ -1,12 +1,12 @@
 let cancelCurrent = () => {};
-export function confettiMultiplier(value = 6) {
+export function confettiMultiplier(value = 1) {
   const number = Number(value);
   return Number.isFinite(number)
     ? Math.max(1, Math.min(20, Math.round(number)))
-    : 6;
+    : 1;
 }
 
-export function celebrate(multiplier = 6) {
+export function celebrate(multiplier = 1) {
   cancelCurrent();
   const canvas = document.createElement("canvas");
   canvas.className = "confetti";

@@ -78,7 +78,8 @@ test("guesses and scoring stay server-side; answers appear only after everyone s
     "Our mix",
   );
 });
-test("skip voting counts one vote per unsolved player and requires a majority", async () => {
+test("all connected players must vote before one 30-second countdown starts", async (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout", "Date"] });
   const { hub, room, host, players } = setup();
   await hub.next(room);
   const roundId = room.round.id;
@@ -89,7 +90,23 @@ test("skip voting counts one vote per unsolved player and requires a majority", 
   await hub.command(room, players[2], { type: "vote", roundId });
   assert.equal(room.round.stage, 0);
   await hub.command(room, host, { type: "vote", roundId });
+  assert.equal(room.round.stage, 0);
+  assert.equal(room.round.skipAt, null, "Three of four votes is not enough");
+  await hub.command(room, players[3], { type: "vote", roundId });
+  const deadline = room.round.skipAt;
+  assert.equal(deadline, Date.now() + 30000);
+  t.mock.timers.tick(1000);
+  await hub.command(room, players[1], { type: "vote", roundId });
+  assert.equal(
+    room.round.skipAt,
+    deadline,
+    "Repeated votes cannot restart the timer",
+  );
+  t.mock.timers.tick(28999);
+  assert.equal(room.round.stage, 0);
+  t.mock.timers.tick(1);
   assert.equal(room.round.stage, 1);
+  assert.equal(room.round.skipAt, null);
   assert.equal(room.round.votes.size, 0);
   assert.equal(room.round.playback.seconds, 0.5);
   await assert.rejects(
@@ -109,7 +126,8 @@ test("reconnecting keeps identity and score; leaving transfers the host", async 
   assert.throws(() => hub.authorize(room.code, host.token), /Join the lobby/);
 });
 
-test("existing votes take effect when a correct guess reduces the voting majority", async () => {
+test("solved players still vote and reconnecting preserves the countdown", async (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout", "Date"] });
   const { hub, room, host, players } = setup();
   await hub.next(room);
   const roundId = room.round.id;
@@ -121,8 +139,80 @@ test("existing votes take effect when a correct guess reduces the voting majorit
     roundId,
     title: "Test Song",
   });
+  assert.equal(room.round.stage, 0);
+  assert.equal(room.round.skipAt, null);
+  await hub.command(room, players[2], { type: "vote", roundId });
+  assert.equal(room.round.skipAt, null);
+  await hub.command(room, players[3], { type: "vote", roundId });
+  assert.equal(room.round.skipAt, Date.now() + 30000);
+  const deadline = room.round.skipAt;
+  t.mock.timers.tick(5000);
+  hub.disconnect(room, players[2]);
+  hub.connect(room, players[2], () => {});
+  assert.equal(hub.snapshot(room, players[2]).round.skipAt, deadline);
+  t.mock.timers.tick(25000);
   assert.equal(room.round.stage, 1);
   assert.equal(room.round.votes.size, 0);
+});
+
+test("disconnected players do not hold up voting, and empty rooms cancel timers", async (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout", "Date"] });
+  const { hub, room, players } = setup();
+  await hub.next(room);
+  for (const player of players.slice(0, 3))
+    await hub.command(room, player, { type: "vote", roundId: room.round.id });
+  assert.equal(room.round.skipAt, null);
+  hub.disconnect(room, players[3]);
+  assert.equal(room.round.skipAt, Date.now() + 30000);
+  for (const player of players.slice(0, 3)) hub.disconnect(room, player);
+  assert.equal(room.round.skipAt, null);
+  t.mock.timers.tick(30000);
+  assert.equal(room.round.stage, 0);
+});
+
+test("countdowns reveal the final clip and cannot affect a later round", async (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout", "Date"] });
+  const { hub, room, host, players } = setup();
+  await hub.next(room);
+  room.round.stage = 4;
+  for (const player of players)
+    await hub.command(room, player, { type: "vote", roundId: room.round.id });
+  assert.equal(room.round.phase, "guessing");
+  t.mock.timers.tick(30000);
+  assert.equal(room.round.phase, "revealed");
+  assert.equal(room.round.playback.seconds, 30);
+  await hub.next(room);
+  for (const player of players)
+    await hub.command(room, player, { type: "vote", roundId: room.round.id });
+  await hub.command(room, host, { type: "reveal", roundId: room.round.id });
+  await hub.next(room);
+  t.mock.timers.tick(30000);
+  assert.equal(room.round.stage, 0);
+  assert.equal(room.round.phase, "guessing");
+  assert.equal(room.round.skipAt, null);
+});
+
+test("host skips and everyone solving cancel pending countdowns", async (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout", "Date"] });
+  const { hub, room, host, players } = setup();
+  await hub.next(room);
+  for (const player of players)
+    await hub.command(room, player, { type: "vote", roundId: room.round.id });
+  await hub.command(room, host, { type: "skip", roundId: room.round.id });
+  t.mock.timers.tick(30000);
+  assert.equal(room.round.stage, 1);
+  for (const player of players)
+    await hub.command(room, player, { type: "vote", roundId: room.round.id });
+  for (const player of players)
+    await hub.command(room, player, {
+      type: "guess",
+      roundId: room.round.id,
+      title: "Test Song",
+    });
+  assert.equal(room.round.skipAt, null);
+  t.mock.timers.tick(30000);
+  assert.equal(room.round.phase, "revealed");
+  assert.equal(room.round.stage, 1);
 });
 test("host disconnect transfers controls after the reconnect grace period", async () => {
   const { hub, room, host, players } = setup({ hostGrace: 5 });
@@ -203,6 +293,36 @@ test("only the host's decoded audio sets a room's shared random point", async ()
   assert.equal(room.round.playback.offset, offset);
   await hub.command(room, host, { type: "skip", roundId });
   assert.equal(room.round.playback.offset, offset);
+});
+
+test("the host shares its waveform-checked start and later ready messages cannot move it", async () => {
+  const { hub, room, host, players } = setup();
+  await hub.next(room);
+  const roundId = room.round.id;
+  await hub.command(room, players[1], {
+    type: "ready",
+    roundId,
+    duration: 30,
+    startOffset: 8,
+  });
+  assert.equal(room.round.timingReady, false);
+  await hub.command(room, host, {
+    type: "ready",
+    roundId,
+    duration: 30,
+    startOffset: 2,
+  });
+  assert.equal(room.round.offset, 2);
+  assert.equal(room.round.timingReady, true);
+  await hub.command(room, host, {
+    type: "ready",
+    roundId,
+    duration: 30,
+    startOffset: 5,
+  });
+  assert.equal(room.round.offset, 2);
+  hub.leave(room, host);
+  assert.equal(room.round.offset, 2);
 });
 
 test("wrong guesses are private, reject repeats, survive reconnects, and reset each round", async () => {

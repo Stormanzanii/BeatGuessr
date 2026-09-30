@@ -2,7 +2,7 @@ import { createServer } from "node:http";
 import { readFile, writeFile, mkdir, rename } from "node:fs/promises";
 import { resolve, extname, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { genres, filterCatalog, mergeSongs } from "./catalog.js";
+import { catalog, genres, filterCatalog, mergeSongs } from "./catalog.js";
 import {
   resolveSong,
   media,
@@ -50,6 +50,10 @@ function save() {
   return saveQueue;
 }
 const audioCache = new Map();
+const popular = catalog.map((song) => ({
+  ...song,
+  poolSources: [{ id: "curated", name: "Popular" }],
+}));
 const audioTasks = new Map();
 async function audioFor(song) {
   const cached = audioCache.get(song.id);
@@ -121,6 +125,7 @@ function selectedPool(owner, sources) {
     throw new Error("Choose up to 30 playlists.");
   return mergeSongs(
     ...sources.map((id) => {
+      if (id === "curated") return popular;
       const playlist = visiblePlaylists(owner).find((p) => p.id === id);
       if (!playlist) throw new Error("Playlist not found in your imports.");
       return playlist.tracks.map((track) => ({
@@ -210,7 +215,7 @@ export const server = createServer(async (req, res) => {
     if (req.method === "GET" && url.pathname === "/api/health")
       return json(res, 200, {
         ok: true,
-        songs: mergeSongs(...ownPlaylists.map((p) => p.tracks)).length,
+        songs: mergeSongs(popular, ...ownPlaylists.map((p) => p.tracks)).length,
       });
     if (req.method === "GET" && url.pathname === "/api/catalog") {
       const sources = [
@@ -218,7 +223,7 @@ export const server = createServer(async (req, res) => {
           (
             url.searchParams.get("sources") ??
             url.searchParams.get("source") ??
-            ""
+            "curated"
           )
             .split(",")
             .filter(Boolean),
@@ -226,6 +231,10 @@ export const server = createServer(async (req, res) => {
       ];
       const collections = [];
       for (const source of sources) {
+        if (source === "curated") {
+          collections.push(popular);
+          continue;
+        }
         const playlist = ownPlaylists.find((p) => p.id === source);
         if (!playlist)
           return json(res, 404, {
@@ -259,6 +268,7 @@ export const server = createServer(async (req, res) => {
     }
     if (req.method === "GET" && url.pathname === "/api/playlists") {
       return json(res, 200, {
+        builtIns: [{ id: "curated", name: "Popular", count: popular.length }],
         playlists: ownPlaylists.map(({ tracks, ownerId, ...p }) => ({
           ...p,
           count: tracks.length,
@@ -329,9 +339,9 @@ export const server = createServer(async (req, res) => {
     }
     if (req.method === "POST" && url.pathname === "/api/resolve") {
       const input = await body(req);
-      const seed = ownPlaylists
-        .flatMap((p) => p.tracks)
-        .find((t) => t.id === input.id);
+      const seed = [...popular, ...ownPlaylists.flatMap((p) => p.tracks)].find(
+        (t) => t.id === input.id,
+      );
       if (!seed)
         return json(res, 404, { error: "Song not found in your library." });
       return json(res, 200, {

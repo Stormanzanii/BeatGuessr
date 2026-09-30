@@ -1,4 +1,5 @@
 import { randomClipStart } from "./clip-start.js";
+import { audibleClipStart } from "./audio-start.js";
 export const CLIP_LENGTHS = [0.1, 0.5, 2, 8, 15];
 
 export class ClipPlayer {
@@ -25,7 +26,9 @@ export class ClipPlayer {
       this.gain.gain.value = this.volume;
       this.gain.connect(this.context.destination);
     }
-    return this.context.decodeAudioData(bytes.slice(0));
+    const buffer = await this.context.decodeAudioData(bytes.slice(0));
+    audibleClipStart(buffer);
+    return buffer;
   }
   setBuffer(buffer, randomStart = false) {
     this.stop();
@@ -34,7 +37,31 @@ export class ClipPlayer {
   }
   setStart(randomStart) {
     this.stop();
-    this.offset = randomStart ? randomClipStart(this.buffer?.duration) : 0;
+    this.offset = this.buffer
+      ? audibleClipStart(
+          this.buffer,
+          randomStart ? randomClipStart(this.buffer.duration) : 0,
+        )
+      : 0;
+    this.stoppedAt = this.offset;
+    this.lastSchedule = null;
+  }
+  get position() {
+    if (this.source && this.lastSchedule && this.context) {
+      const { offset, at, seconds } = this.lastSchedule;
+      return (
+        offset + Math.max(0, Math.min(seconds, this.context.currentTime - at))
+      );
+    }
+    return this.stoppedAt ?? this.offset ?? 0;
+  }
+  continuation(seconds, offset = this.offset) {
+    const end = Math.min(this.buffer.duration, offset + seconds);
+    const heard = this.lastSchedule
+      ? Math.max(offset, Math.min(end, this.position))
+      : offset;
+    const start = heard < end ? heard : offset;
+    return { offset: start, seconds: end - start };
   }
   setVolume(value) {
     this.volume = value;
@@ -73,6 +100,7 @@ export class ClipPlayer {
       source.disconnect();
       envelope.disconnect();
       if (this.source !== source) return;
+      this.stoppedAt = offset + duration;
       this.source = null;
       this.playing = false;
       cancelAnimationFrame(this.frame);
@@ -91,6 +119,7 @@ export class ClipPlayer {
     animate();
   }
   stop(invalidate = true) {
+    this.stoppedAt = this.position;
     if (invalidate) this.generation++;
     cancelAnimationFrame(this.frame);
     const source = this.source;
