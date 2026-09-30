@@ -109,6 +109,8 @@ spicetify config extensions beatguessr-export.js
 spicetify apply
 ```
 
+All three commands are needed: copying or downloading the file only installs it on disk. `spicetify config extensions beatguessr-export.js` enables the extension alongside your existing extensions, and `spicetify apply` loads it into Spotify and restarts the client. If the export menu is missing, run `spicetify config extensions` and check that `beatguessr-export.js` appears in the list, then run `spicetify apply` again.
+
 Then right-click a playlist in Spotify and choose **Export for BeatGuessr**. Import the downloaded CSV here. The exporter reads successive pages, including when Spotify returns fewer entries than requested. It supports up to 10,000 entries and stops with an error if pages repeat or end before the reported total. It includes the original playlist URL, so importing its CSV replaces the matching partial Spotify import while keeping the source selected.
 
 Applying Spicetify can restart Spotify. Pagination is covered by automated tests, including a 350-song playlist, but this optional integration has not been validated in a live Spotify session; its internal API can change between Spotify versions.
