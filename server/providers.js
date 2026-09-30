@@ -99,7 +99,14 @@ export async function searchSongs(query) {
 }
 
 export async function resolveSong(seed, failedSource) {
-  const key = `${seed.id}|${failedSource || ""}`;
+  const key = JSON.stringify([
+    seed.id,
+    seed.title,
+    seed.artist,
+    seed.year,
+    seed.genre,
+    failedSource,
+  ]);
   const cached = metadataCache.get(key);
   if (cached && Date.now() - cached.at < 5 * 60 * 1000) return cached.song;
   if (inflight.has(key)) return inflight.get(key);

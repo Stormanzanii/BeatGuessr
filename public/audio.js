@@ -42,7 +42,7 @@ export class ClipPlayer {
     if (this.gain)
       this.gain.gain.setTargetAtTime(value, this.context.currentTime, 0.015);
   }
-  async play(seconds, { offset = this.offset } = {}) {
+  async play(seconds, { offset = this.offset, when } = {}) {
     const request = ++this.generation;
     await this.unlock();
     if (request !== this.generation || !this.buffer) return;
@@ -55,7 +55,7 @@ export class ClipPlayer {
     const envelope = this.context.createGain();
     source.connect(envelope);
     envelope.connect(this.gain);
-    const at = this.context.currentTime + 0.02;
+    const at = Math.max(this.context.currentTime + 0.02, when ?? 0);
     const fade = Math.min(0.003, duration / 10);
     envelope.gain.setValueAtTime(0, at);
     envelope.gain.linearRampToValueAtTime(1, at + fade);

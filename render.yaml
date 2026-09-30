@@ -1,0 +1,23 @@
+services:
+  - type: web
+    name: beatguessr
+    runtime: node
+    plan: free
+    region: singapore
+    buildCommand: npm ci --omit=dev
+    startCommand: npm start
+    healthCheckPath: /api/health
+    autoDeployTrigger: checksPass
+    domains:
+      - beatguessr.clypdat.xyz
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: "22"
+      - key: HOST
+        value: 0.0.0.0
+      - key: APP_ORIGIN
+        value: https://beatguessr.clypdat.xyz
+      - key: SESSION_SECRET
+        generateValue: true

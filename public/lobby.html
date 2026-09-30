@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#161616" />
+    <title>Play with friends · BeatGuessr</title>
+    <link rel="icon" href="/icon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="/style.css" />
+    <link rel="stylesheet" href="/layout.css" />
+    <link rel="stylesheet" href="/lobby.css" />
+    <script type="module" src="/lobby.js"></script>
+  </head>
+  <body>
+    <header class="topbar">
+      <a class="brand" href="/">BeatGuessr</a>
+      <div class="top-actions">
+        <a class="text-button" href="/">Play solo</a
+        ><span id="connection" role="status">Play with friends</span>
+      </div>
+    </header>
+    <main class="lobby-shell">
+      <section id="setup" class="panel lobby-setup">
+        <div class="eyebrow">YOUR MUSIC. YOUR PEOPLE.</div>
+        <h1>Bring the whole room.</h1>
+        <p class="muted">
+          One host runs the music. Everyone guesses. Vote together for a longer
+          clip.
+        </p>
+        <label class="field-label" for="nickname">Your nickname</label
+        ><input
+          id="nickname"
+          maxlength="24"
+          placeholder="What should we call you?"
+          autocomplete="nickname"
+        />
+        <div class="lobby-entry-grid">
+          <section>
+            <h2>Join your friends</h2>
+            <label class="field-label" for="room-code">Room code</label
+            ><input
+              id="room-code"
+              maxlength="6"
+              placeholder="ABC123"
+              autocomplete="off"
+            /><button id="join-room" class="button primary">Join room</button>
+          </section>
+          <section>
+            <h2>Host a room</h2>
+            <p class="muted small">
+              Choose the playlists everyone will guess from. Up to 16 players.
+            </p>
+            <div id="lobby-sources" class="lobby-sources"></div>
+            <div class="lobby-import">
+              <label for="lobby-csv" class="button outlined">Import CSV</label
+              ><input
+                id="lobby-csv"
+                type="file"
+                accept=".csv,text/csv"
+                hidden
+              /><a href="/" class="text-button">Manage playlists</a>
+            </div>
+            <button id="create-room" class="button primary">Create room</button>
+          </section>
+        </div>
+        <p class="muted small">
+          Joining enables audio in your browser. Local audio files remain
+          available in solo mode.
+        </p>
+      </section>
+      <div id="room" class="lobby-room" hidden>
+        <section class="panel room-game">
+          <div class="room-heading">
+            <div>
+              <div class="eyebrow">ROOM <span id="code-label"></span></div>
+              <h1 id="round-title">Ready when you are.</h1>
+            </div>
+            <button id="copy-invite" class="button outlined">
+              Copy invite
+            </button>
+          </div>
+          <p id="room-message" class="muted" role="status"></p>
+          <div class="room-record-wrap">
+            <div id="lobby-record" class="lobby-record">
+              <div class="lobby-label">
+                <span id="record-word">BEATGUESSR</span
+                ><img id="lobby-cover" alt="" hidden />
+              </div>
+              <span class="lobby-spindle" aria-hidden="true"></span>
+            </div>
+          </div>
+          <div id="answer" class="room-answer" hidden>
+            <span class="eyebrow">MEET THE TRACK</span>
+            <h2 id="answer-title"></h2>
+            <p id="answer-artist"></p>
+            <p id="answer-meta" class="muted small"></p>
+            <p id="answer-sources" class="muted small"></p>
+            <div id="answer-links"></div>
+          </div>
+          <div class="audio-progress"><div id="room-progress"></div></div>
+          <div id="clip-status" class="clip-status">
+            Waiting for the first round
+          </div>
+          <button id="enable-audio" class="button outlined" hidden>
+            Enable audio
+          </button>
+          <div id="host-controls" class="host-controls" hidden>
+            <button id="host-play" class="button primary">Play clip</button
+            ><button id="host-stop" class="button outlined">Stop</button
+            ><button id="host-skip" class="button outlined">Longer clip</button
+            ><button id="host-reveal" class="text-button">Reveal answer</button
+            ><button id="host-next" class="button primary">Start round</button>
+          </div>
+          <form id="room-guess-form" autocomplete="off">
+            <label for="room-guess" class="field-label">Your guess</label>
+            <div class="room-guess-row">
+              <input
+                id="room-guess"
+                placeholder="Type a song title…"
+                maxlength="300"
+                role="combobox"
+                aria-autocomplete="list"
+                aria-expanded="false"
+                aria-controls="room-suggestions"
+              /><button id="room-submit" class="button primary">Guess</button>
+            </div>
+            <div
+              id="room-suggestions"
+              class="suggestions"
+              role="listbox"
+              hidden
+            ></div>
+          </form>
+          <p id="guess-feedback" role="status" aria-live="polite"></p>
+          <button id="vote-skip" class="button outlined">
+            Vote for longer clip
+          </button>
+        </section>
+        <aside class="panel room-sidebar">
+          <div class="eyebrow">THE LOBBY</div>
+          <h2>Who knows this one?</h2>
+          <p class="muted small">
+            Earlier guesses earn more points. Answers stay private until the
+            reveal.
+          </p>
+          <div id="players"></div>
+          <div class="room-volume">
+            <label for="room-volume" class="field-label">Your volume</label
+            ><input
+              id="room-volume"
+              type="range"
+              min="0"
+              max="100"
+              value="60"
+            />
+          </div>
+          <button id="leave-room" class="button outlined">Leave room</button>
+          <p class="muted small">
+            The host controls playback. A majority of players still guessing can
+            vote for a longer clip.
+          </p>
+        </aside>
+      </div>
+      <p id="lobby-error" class="message error" role="alert"></p>
+    </main>
+  </body>
+</html>

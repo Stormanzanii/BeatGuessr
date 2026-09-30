@@ -1,6 +1,6 @@
 # BeatGuessr
 
-A localhost song guessing game with 0.1, 0.5, 2, 8, and 15 second clips. Combine Spotify playlists, filter by genre or year, or play from your own audio files.
+A song guessing game with solo play and multiplayer lobbies. Guess from 0.1, 0.5, 2, 8, and 15 second clips. Combine Spotify playlists, filter by genre or year, or play from your own audio files in solo mode.
 
 ## Setup
 
@@ -26,7 +26,7 @@ Open **http://localhost:3000**. Leave the terminal running while you play. Press
 
 If you downloaded a ZIP, extract it and open a terminal in the folder containing `package.json`, then run `npm ci` and `npm start`.
 
-The server listens on `127.0.0.1`, so it is accessible only on the computer running it. Import a Spotify playlist or CSV, or add local audio to start playing. The game uses your selected sources; there is no built-in popular-song pool or background catalog expansion. Personal playlists are not bundled with the repository.
+By default the server listens on `127.0.0.1`, so it is accessible only on the computer running it. Import a Spotify playlist or CSV, or add local audio to start playing. The game uses your selected sources; there is no built-in popular-song pool or background catalog expansion. Personal playlists are not bundled with the repository. For online play, see [Deploy on Render](#deploy-on-render).
 
 ### Use another port
 
@@ -45,7 +45,7 @@ macOS or Linux:
 PORT=3001 npm start
 ```
 
-Then open http://localhost:3001. `PORT` is the only configuration variable; no `.env` file is required.
+Then open http://localhost:3001. No `.env` file is required for local use. Deployment also supports `HOST`, `APP_ORIGIN`, `SESSION_SECRET`, and `DATA_DIR` as described below.
 
 ### Update or develop
 
@@ -79,7 +79,34 @@ Correct answers animate the record and release confetti. The saved slider under 
 
 Open Sources and check one or more collections. Press Apply & new song to shuffle their combined pool. Overlapping songs are deduplicated, so the same song appearing in two playlists does not receive double the chance of selection. Genre and year controls are under Genre & release years. The app avoids recently served songs until the selected pool is exhausted.
 
-A correct guess puts the album artwork on the centre record, with the title, artist, album/year, source, and listening links underneath. The record spins during playback, including the automatic 30-second winning snippet. Shorter previews or local files play their available duration. Use the play button to stop or replay the snippet; Next song stops it immediately. A late random starting point shifts back when needed to leave room for the full snippet. Revealing an unsolved song does not trigger automatic playback.
+Revealing a song puts the album artwork on the centre record, with the title, artist, album/year, source, and listening links underneath. Every reveal automatically plays a 30-second snippet, including rounds nobody solved. The record spins during playback. Shorter previews or local files play their available duration. Use the play button to stop or replay the snippet; Next song stops it immediately. A late random starting point shifts back when needed to leave room for the full snippet.
+
+## Play with friends
+
+Open **Play with friends**, enter a nickname, choose imported playlists, and create a room. Send **Copy invite** to your friends or share the six-character room code. Up to 16 players can join, including the host. Each player clicks Join to enable browser audio.
+
+The host starts rounds and controls playback, stopping, longer clips, and revealing the answer. Everyone guesses independently. Correct guesses earn 100 / 80 / 60 / 40 / 20 points at the five clip lengths; answers stay private until everyone connected solves or the host reveals. A majority of connected players still guessing can vote for a longer clip. At 15 seconds the next skip reveals the track. Every reveal plays up to 30 seconds, whether anyone solved it or not.
+
+The server checks guesses and permissions. Clients preload the same audio and schedule playback using a shared timestamp, with clock-offset and late-arrival adjustment. Network and browser scheduling can still introduce small timing differences. A disconnected player can rejoin from the same tab with their score intact. The host has a 30-second reconnection grace period after a detected disconnect; controls then pass to another connected player. Leaving transfers controls immediately.
+
+Rooms expire after two hours without activity and are held in server memory. Lobbies use imported playlist previews; local audio remains a solo feature. Hosted imports belong to the browser that imported them, while invited room members can guess from the host's selected songs. Clearing browser cookies loses access to those hosted imports.
+
+## Deploy on Render
+
+[Deploy this repository on Render](https://render.com/deploy?repo=https://github.com/Stormanzanii/BeatGuessr) using the included `render.yaml`. It creates **one Free Node web service** in Singapore, with no paid disk or database. Build: `npm ci --omit=dev`. Start: `npm start`. Health check: `/api/health`.
+
+The Blueprint sets `HOST=0.0.0.0`, `APP_ORIGIN=https://beatguessr.clypdat.xyz`, and generates `SESSION_SECRET` for signed browser sessions. Render supplies `PORT` and `RENDER_EXTERNAL_URL`; its default service URL is also accepted as an application origin. `DATA_DIR` optionally selects a playlist storage directory when using persistent hosting. Use one server instance: active rooms are not shared across instances.
+
+Render's [Free tier](https://render.com/docs/free) sleeps after 15 minutes without inbound traffic and takes about a minute to wake. Its filesystem is ephemeral: imports and rooms are lost on a restart, redeploy, or sleep. Keep your CSV exports so the host can reimport them. This setup has no persistent-storage guarantee.
+
+After the service is deployed:
+
+1. Check `beatguessr.clypdat.xyz` under the Render service's **Settings → Custom Domains**. The Blueprint declares this domain automatically.
+2. In Cloudflare's DNS for `clypdat.xyz`, create a **CNAME** named `beatguessr` pointing to the exact `…onrender.com` hostname assigned to the service. Start with **DNS only** and automatic TTL.
+3. Verify the domain in Render and wait for its managed HTTPS certificate. See [Render's custom-domain documentation](https://render.com/docs/custom-domains).
+4. Open `https://beatguessr.clypdat.xyz`, import your playlists, then create a lobby. Invite links use `/lobby/ROOMCODE` on the current hostname.
+
+The CNAME target must come from the actual deployment; the repository does not assume that a particular Render hostname is available.
 
 ## Music sources
 
@@ -131,13 +158,16 @@ Spotify's [developer policy](https://developer.spotify.com/policy) prohibits gam
 | `public/audio.js`                           | Decoding and audio-clock scheduling                              |
 | `public/confetti.js`                        | Full-screen win celebration                                      |
 | `public/style.css`, `public/layout.css`     | Flat styling, equal-height desktop panels, responsive layout     |
-| `server/index.js`                           | Local HTTP server, API, persistence, restricted audio proxy      |
-| `server/catalog.js`                         | Song deduplication and genre/year filtering                       |
+| `server/index.js`                           | HTTP/WebSocket server, API, persistence, restricted audio proxy  |
+| `server/lobbies.js`, `server/access.js`     | Room rules, scoring, host permissions, signed browser sessions   |
+| `public/lobby.js`, `public/lobby.html`      | Room setup, shared playback, guesses, votes, and scoreboard      |
+| `render.yaml`                               | Free Render deployment configuration                             |
+| `server/catalog.js`                         | Song deduplication and genre/year filtering                      |
 | `server/providers.js`, `server/matching.js` | Preview lookup, matching, expiring URL refresh                   |
 | `server/playlists.js`                       | Spotify embed and CSV parsing                                    |
 | `research/songspot-analysis.md`             | Public-client reverse engineering and evidence                   |
 
-No accounts, database service, API keys, or frontend build step are required. Settings and the most recent 2,000 served song IDs are stored in browser localStorage. Session scores reset on reload. Playlist metadata is saved to `data/playlists.json`. Decoded previews and a bounded server audio cache are transient. Network access is required for provider previews and imports; imported local audio can play offline once the local app is open.
+No player accounts, database service, music API keys, or frontend build step are required. Settings and the most recent 2,000 served song IDs are stored in browser localStorage. Solo session scores reset on reload; lobby scores remain on the running server and rejoining uses a token stored in that tab's sessionStorage. Playlist metadata is saved to `data/playlists.json` or `DATA_DIR`. Decoded previews and a bounded server audio cache are transient. Network access is required for provider previews and imports; imported local audio can play offline once the local app is open.
 
 ## Check
 
@@ -155,3 +185,5 @@ npm run test:browser
 ```
 
 Keep the server running for browser tests. They use real provider audio and create/delete their own CSV test playlists. Checks cover all five clip schedules, skip and guess progression, correct-answer confetti, combined playlist deduplication, source checkboxes, year/genre filters, aligned desktop panels, mobile overflow, and browser errors. Screenshots are written to `test-results/`. Provider availability can affect the live tests.
+
+`npm run test:lobby` starts its own server with temporary storage and deterministic audio, then opens four independent browser sessions. It checks private imports, joining, host permissions, shared playback timestamps, votes, scores, solved and unsolved 30-second reveals, host transfer, rejoining, and mobile layout. It requires Playwright Chromium but no running app or music-provider connection.
