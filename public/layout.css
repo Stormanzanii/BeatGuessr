@@ -219,6 +219,7 @@ input[type="text"] {
   padding: 25px 0 12px;
 }
 .record {
+  position: relative;
   width: 270px;
   height: 270px;
   transform: rotate(-14deg);
@@ -227,6 +228,29 @@ input[type="text"] {
   display: block;
   width: 100%;
   height: 100%;
+}
+.record-art {
+  position: absolute;
+  inset: 22%;
+  overflow: hidden;
+  border-radius: 50%;
+  border: 2px solid #101410;
+  box-shadow:
+    0 0 0 2px #ffffff16,
+    0 3px 14px #0008;
+}
+.record-art img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.record-spindle {
+  position: absolute;
+  inset: calc(50% - 5px);
+  border-radius: 50%;
+  background: #111410;
+  box-shadow: 0 0 0 2px #ffffff40;
 }
 .record.spinning {
   animation: record-spin 4s linear infinite;
@@ -336,20 +360,59 @@ input[type="text"] {
   flex-basis: auto;
 }
 .reveal {
-  margin-top: 14px;
-  padding-top: 17px;
+  flex-direction: column;
+  text-align: center;
+  margin: 0 0 20px;
+  padding: 0;
+  border: 0;
+  gap: 16px;
 }
 .reveal.won {
   animation: answer-in 0.55s cubic-bezier(0.2, 1.7, 0.4, 1);
 }
 .reveal-info h2 {
-  font-size: 20px;
+  font-size: clamp(23px, 2.5vw, 32px);
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+}
+.reveal-info {
+  width: 100%;
+  min-width: 0;
+}
+.reveal-info p {
+  overflow-wrap: anywhere;
+}
+#reveal-artist {
+  font-size: 15px;
+  margin-top: 8px;
+}
+#reveal-meta {
+  font-size: 11px;
+  line-height: 1.6;
+}
+#reveal-links {
+  justify-content: center;
+}
+.game.is-revealed .instructions,
+.game.is-revealed .clip-control,
+.game.is-revealed #guess-form,
+.game.is-revealed .guess-history,
+.game.is-revealed #give-up {
+  display: none;
+}
+.game.is-revealed .play-button {
+  background: transparent;
+  color: var(--text);
+  border-color: var(--border);
 }
 .reveal .button {
   font-size: 11px;
 }
 .record-scene.revealed .record {
-  animation: record-win 0.6s ease-out;
+  animation: none;
+}
+.record-scene.revealed .record.spinning {
+  animation: record-spin 6s linear infinite;
 }
 .stats {
   display: grid;
@@ -484,17 +547,6 @@ dialog {
   }
   to {
     transform: rotate(346deg);
-  }
-}
-@keyframes record-win {
-  0% {
-    transform: rotate(-14deg) scale(1);
-  }
-  45% {
-    transform: rotate(10deg) scale(1.12);
-  }
-  100% {
-    transform: rotate(-14deg) scale(1);
   }
 }
 @keyframes answer-in {
@@ -791,6 +843,7 @@ dialog {
 @media (prefers-reduced-motion: reduce) {
   .record.spinning,
   .record-scene.revealed .record,
+  .record-scene.revealed .record.spinning,
   .reveal.won {
     animation: none;
   }

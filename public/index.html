@@ -319,6 +319,7 @@
               />
               <circle cx="150" cy="150" r="55" fill="#bee56c" />
               <text
+                id="record-label-title"
                 x="150"
                 y="132"
                 text-anchor="middle"
@@ -331,6 +332,7 @@
                 BEATGUESSR
               </text>
               <text
+                id="record-label-subtitle"
                 x="150"
                 y="144"
                 text-anchor="middle"
@@ -343,6 +345,7 @@
               </text>
               <circle cx="150" cy="158" r="6" fill="#141714" />
               <text
+                id="record-label-footer"
                 x="150"
                 y="180"
                 text-anchor="middle"
@@ -354,7 +357,22 @@
                 LISTEN CLOSELY
               </text>
             </svg>
+            <div id="record-art" class="record-art" hidden>
+              <img id="reveal-cover" alt="" />
+              <span class="record-spindle" aria-hidden="true"></span>
+            </div>
           </div>
+        </div>
+        <div id="reveal" class="reveal" hidden>
+          <div class="reveal-info">
+            <span id="reveal-result" class="result-label"></span>
+            <h2 id="reveal-title"></h2>
+            <p id="reveal-artist"></p>
+            <p id="reveal-meta" hidden></p>
+            <p id="reveal-source" hidden></p>
+            <div id="reveal-links"></div>
+          </div>
+          <button id="next-button" class="button primary">Next song</button>
         </div>
         <div id="listen-caption" class="listen-caption">
           How little do you need to hear?
@@ -413,17 +431,6 @@
           Loading a song…
         </div>
         <div id="guess-history" class="guess-history"></div>
-        <div id="reveal" class="reveal" hidden>
-          <img id="reveal-cover" alt="Album cover" hidden />
-          <div class="reveal-info">
-            <span id="reveal-result" class="result-label"></span>
-            <h2 id="reveal-title"></h2>
-            <p id="reveal-artist"></p>
-            <p id="reveal-source" hidden></p>
-            <div id="reveal-links"></div>
-          </div>
-          <button id="next-button" class="button primary">Next song</button>
-        </div>
         <div class="game-bottom">
           <button id="give-up" class="text-button" disabled>
             Reveal answer</button

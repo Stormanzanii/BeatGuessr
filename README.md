@@ -79,7 +79,7 @@ Correct answers animate the record and release confetti. The saved slider under 
 
 Open Sources and check one or more collections. Press Apply & new song to shuffle their combined pool. Overlapping songs are deduplicated, so the same song appearing in two playlists does not receive double the chance of selection. Genre and year controls are under Genre & release years. The app avoids recently served songs until the selected pool is exhausted.
 
-A correct guess automatically plays a 30-second snippet alongside the celebration. Shorter previews or local files play their available duration. Use the play button to stop or replay the snippet; Next song stops it immediately. A late random starting point shifts back when needed to leave room for the full snippet. Revealing an unsolved song does not trigger automatic playback.
+A correct guess puts the album artwork on the centre record, with the title, artist, album/year, source, and listening links underneath. The record spins during playback, including the automatic 30-second winning snippet. Shorter previews or local files play their available duration. Use the play button to stop or replay the snippet; Next song stops it immediately. A late random starting point shifts back when needed to leave room for the full snippet. Revealing an unsolved song does not trigger automatic playback.
 
 ## Music sources
 

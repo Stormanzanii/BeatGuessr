@@ -164,15 +164,31 @@ function showReveal(won) {
     ? `IDENTIFIED IN ${seconds}s`
     : "MEET THE TRACK";
   $("reveal-title").textContent = song.title;
-  $("reveal-artist").textContent =
-    `${song.artist}${song.year ? ` · ${song.year}` : ""}`;
+  $("reveal-artist").textContent = song.artist;
+  const metadata = [
+    song.album,
+    song.year,
+    song.genre !== "Unknown" ? song.genre : null,
+  ].filter(Boolean);
+  $("reveal-meta").textContent = metadata.join(" · ");
+  $("reveal-meta").hidden = !metadata.length;
   const sources = song.poolSources || [];
   $("reveal-source").textContent = sources.length
     ? `${sources.length > 1 ? "Sources" : "Source"}: ${sources.map((source) => source.name).join(" · ")}`
     : "";
   $("reveal-source").hidden = !sources.length;
-  $("reveal-cover").hidden = !song.cover;
+  $("record-label-title").textContent = won ? "IDENTIFIED" : "SIDE A";
+  $("record-label-subtitle").textContent = song.title
+    .slice(0, 24)
+    .toUpperCase();
+  $("record-label-footer").textContent = song.artist.slice(0, 24).toUpperCase();
+  $("record-art").hidden = !song.cover;
+  $("reveal-cover").alt = `${song.album || song.title} artwork`;
+  $("reveal-cover").onerror = () => {
+    $("record-art").hidden = true;
+  };
   if (song.cover) $("reveal-cover").src = song.cover;
+  else $("reveal-cover").removeAttribute("src");
   $("reveal-links").replaceChildren();
   for (const [href, label] of [
     [song.listenUrl, `Listen on ${song.source} ↗`],
@@ -193,6 +209,8 @@ function showReveal(won) {
   $("reveal").classList.toggle("won", won);
   if (won) celebrate(Number($("confetti-amount").value));
   $("record-scene").classList.add("revealed");
+  $("record-scene").closest(".game").classList.add("is-revealed");
+  $("listen-caption").hidden = true;
   $("listen-caption").textContent = won
     ? "Some songs just stay with you."
     : "Now that sounds familiar.";
@@ -211,6 +229,14 @@ async function newRound() {
   $("guess").value = "";
   clearSuggestions();
   $("record-scene").classList.remove("revealed");
+  $("record-scene").closest(".game").classList.remove("is-revealed");
+  $("record-art").hidden = true;
+  $("reveal-cover").removeAttribute("src");
+  $("reveal-cover").alt = "";
+  $("record-label-title").textContent = "BEATGUESSR";
+  $("record-label-subtitle").textContent = "SIDE A · UNKNOWN TRACK";
+  $("record-label-footer").textContent = "LISTEN CLOSELY";
+  $("listen-caption").hidden = false;
   $("listen-caption").textContent = "How little do you need to hear?";
   setStage(0);
   setLoading(true);
