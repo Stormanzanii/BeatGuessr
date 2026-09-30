@@ -28,6 +28,7 @@ const state = {
   track: null,
   stage: 0,
   done: false,
+  won: false,
   selectedSources: Array.isArray(settings.sources)
     ? settings.sources
     : [settings.source || "curated"],
@@ -49,10 +50,7 @@ const player = new ClipPlayer(
   (playing) => {
     $("record")?.classList.toggle("spinning", playing);
     $("play-icon").textContent = playing ? "Ⅱ" : "▶";
-    if (!state.loading)
-      $("play-text").textContent = playing
-        ? "Listening…"
-        : `Play ${CLIP_LENGTHS[state.stage]}s clip`;
+    if (!state.loading) $("play-text").textContent = playbackLabel(playing);
   },
 );
 // Useful for inspecting actual audio scheduling in browser devtools.
@@ -75,6 +73,14 @@ function message(text, kind = "") {
   $("message").textContent = text;
   $("message").className = `message ${kind}`;
 }
+function playbackLabel(playing = player.playing) {
+  if (playing) return state.won ? "Stop snippet" : "Listening…";
+  if (state.won) {
+    const seconds = Math.round(Math.min(30, player.buffer.duration) * 10) / 10;
+    return `Replay ${seconds}s snippet`;
+  }
+  return `Play ${CLIP_LENGTHS[state.stage]}s clip`;
+}
 function saveSettings() {
   persist("beatguessr:settings", {
     sources: state.selectedSources.filter((id) => id !== "local"),
@@ -94,9 +100,7 @@ function setLoading(loading) {
   $("guess").disabled = loading || state.done || !state.track;
   $("guess-button").disabled = loading || state.done || !state.track;
   $("give-up").disabled = loading || state.done || !state.track;
-  $("play-text").textContent = loading
-    ? "Loading song…"
-    : `Play ${CLIP_LENGTHS[state.stage]}s clip`;
+  $("play-text").textContent = loading ? "Loading song…" : playbackLabel();
 }
 function setStage(index) {
   player.stop();
@@ -140,6 +144,7 @@ function updateRecent() {
 function showReveal(won) {
   if (state.done || !state.track) return;
   state.done = true;
+  state.won = won;
   player.stop();
   $("suggestions").hidden = true;
   $("guess").setAttribute("aria-expanded", "false");
@@ -187,6 +192,7 @@ function showReveal(won) {
   $("listen-caption").textContent = won
     ? "Some songs just stay with you."
     : "Now that sounds familiar.";
+  if (won) void play();
 }
 
 async function newRound() {
@@ -194,6 +200,7 @@ async function newRound() {
   player.stop();
   state.track = null;
   state.done = false;
+  state.won = false;
   state.wrong = [];
   $("reveal").hidden = true;
   $("guess-history").replaceChildren();
@@ -495,7 +502,14 @@ async function play() {
   if (state.loading || !state.track) return;
   if (player.playing) return player.stop();
   try {
-    await player.play(CLIP_LENGTHS[state.stage]);
+    if (state.won) {
+      // Shift a late random start back so the reward can use the full 30 seconds.
+      const offset = Math.min(
+        player.offset,
+        Math.max(0, player.buffer.duration - 30),
+      );
+      await player.play(30, { offset });
+    } else await player.play(CLIP_LENGTHS[state.stage]);
   } catch (error) {
     message(error.message, "error");
   }

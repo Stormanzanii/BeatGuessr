@@ -76,6 +76,19 @@ try {
   await page.locator("#guess").press("Enter");
   assert.equal(await page.evaluate(() => beatguessr.state.stats.solved), 1);
   assert.equal(await page.locator("#reveal").isVisible(), true);
+  await page.waitForFunction(() => beatguessr.player.playing);
+  const reward = await page.evaluate(() => beatguessr.player.lastSchedule);
+  assert.equal(reward.seconds, Math.min(30, initial.duration));
+  assert.equal(reward.offset, 0);
+  assert.equal(await page.locator("#play-text").textContent(), "Stop snippet");
+  await page.locator("#play-button").click();
+  assert.equal(await page.evaluate(() => beatguessr.player.playing), false);
+  await page.locator("#play-button").click();
+  await page.waitForFunction(() => beatguessr.player.playing);
+  assert.equal(
+    await page.evaluate(() => beatguessr.player.lastSchedule.seconds),
+    reward.seconds,
+  );
   assert.equal(
     await page.locator("canvas.confetti").getAttribute("data-particles"),
     "9000",
@@ -87,6 +100,11 @@ try {
   );
 
   await page.locator("#next-button").click();
+  assert.equal(
+    await page.evaluate(() => beatguessr.player.playing),
+    false,
+    "Next song stops the winning snippet",
+  );
   await page.waitForFunction(
     () => !beatguessr.state.loading && beatguessr.state.track != null,
     null,
@@ -95,6 +113,12 @@ try {
   await page.locator("#skip-button").click();
   assert.equal(await page.evaluate(() => beatguessr.state.stage), 1);
   console.log("Skip button beside textbox advances the clip.");
+  await page.locator("#give-up").click();
+  assert.equal(
+    await page.evaluate(() => beatguessr.player.playing),
+    false,
+    "Revealing an unsolved song must not autoplay the reward",
+  );
 
   await page.locator(".filter-settings > summary").click();
   await page.locator("#genre").selectOption("Rock");
@@ -232,6 +256,60 @@ try {
   await page.locator("#play-button").click();
   await page.waitForFunction(() => !beatguessr.player.playing);
   console.log("Local WAV import decodes and plays from the actual intro.");
+  await page.evaluate(() => {
+    beatguessr.player.offset = 1;
+  });
+  await page.locator("#guess").fill("Fixture Song");
+  await page.locator("#guess").press("Enter");
+  await page.waitForFunction(() => beatguessr.player.playing);
+  assert.equal(
+    await page.evaluate(() => beatguessr.player.lastSchedule.seconds),
+    16,
+    "Short audio uses the full available snippet",
+  );
+  assert.equal(
+    await page.evaluate(() => beatguessr.player.lastSchedule.offset),
+    0,
+  );
+  await page.locator("#next-button").click();
+  await page.waitForFunction(
+    () => !beatguessr.state.loading && beatguessr.state.track != null,
+  );
+  await page.evaluate(() => {
+    const { player } = beatguessr;
+    player.setBuffer(
+      player.context.createBuffer(
+        1,
+        player.context.sampleRate * 45,
+        player.context.sampleRate,
+      ),
+    );
+    player.offset = 35;
+  });
+  await page.locator("#guess").fill("Fixture Song");
+  await page.locator("#guess").press("Enter");
+  await page.waitForFunction(() => beatguessr.player.playing);
+  assert.equal(
+    await page.evaluate(() => beatguessr.player.lastSchedule.seconds),
+    30,
+  );
+  assert.equal(
+    await page.evaluate(() => beatguessr.player.lastSchedule.offset),
+    15,
+    "A late random start shifts back to leave 30 seconds",
+  );
+  assert.equal(
+    await page.evaluate(() => beatguessr.player.offset),
+    35,
+    "Reward playback preserves the round offset",
+  );
+  await page.locator("#next-button").click();
+  await page.waitForFunction(
+    () => !beatguessr.state.loading && beatguessr.state.track != null,
+  );
+  console.log(
+    "Correct guesses autoplay up to 30 seconds; replay, short files, random starts, and next-song cancellation passed.",
+  );
 
   await page.setViewportSize({ width: 390, height: 844 });
   assert.equal(

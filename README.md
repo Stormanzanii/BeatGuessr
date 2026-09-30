@@ -77,6 +77,8 @@ Press Play, then type a title or choose a suggestion. Enter submits your guess. 
 
 Open Sources and check one or more collections. Press Apply & new song to shuffle their combined pool. Overlapping songs are deduplicated, so the same song appearing in two playlists does not receive double the chance of selection. Genre and year controls are under Genre & release years. The app avoids recently served songs until the selected pool is exhausted.
 
+A correct guess automatically plays a 30-second snippet alongside the celebration. Shorter previews or local files play their available duration. Use the play button to stop or replay the snippet; Next song stops it immediately. A late random starting point shifts back when needed to leave room for the full snippet. Revealing an unsolved song does not trigger automatic playback.
+
 ## Music sources
 
 - **Built-in songs:** 233 hand-selected tracks with original release years, plus the locally expanded catalog. Manage imports & more songs → Get more built-in songs fetches popular tracks for the built-in artists and their album dates from Deezer. The expanded catalog is saved in `data/expanded-catalog.json`. These additional dates describe the provider's album edition and can be reissue dates. Genre is inherited from the seed artist category.

@@ -42,12 +42,12 @@ export class ClipPlayer {
     if (this.gain)
       this.gain.gain.setTargetAtTime(value, this.context.currentTime, 0.015);
   }
-  async play(seconds) {
+  async play(seconds, { offset = this.offset } = {}) {
     const request = ++this.generation;
     await this.unlock();
     if (request !== this.generation || !this.buffer) return;
     this.stop(false);
-    const duration = Math.min(seconds, this.buffer.duration - this.offset);
+    const duration = Math.min(seconds, this.buffer.duration - offset);
     if (duration <= 0)
       throw new Error("No audio is available at this starting point.");
     const source = this.context.createBufferSource();
@@ -65,7 +65,7 @@ export class ClipPlayer {
     this.playing = true;
     this.lastSchedule = {
       seconds: duration,
-      offset: this.offset,
+      offset,
       at,
       endsAt: at + duration,
     };
@@ -81,7 +81,7 @@ export class ClipPlayer {
       this.onPlaying(false);
     };
     // The audio clock enforces the duration even when animation frames are throttled.
-    source.start(at, this.offset, duration);
+    source.start(at, offset, duration);
     const animate = () => {
       if (this.source !== source) return;
       this.onProgress(
