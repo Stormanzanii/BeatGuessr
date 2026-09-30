@@ -53,8 +53,10 @@ export function parseSpotifyEmbed(html, id) {
     name: entity.title || entity.name || "Spotify playlist",
     tracks,
     spotifyUrl: `https://open.spotify.com/playlist/${id}`,
+    importMethod: "spotify-embed",
+    possiblyTruncated: tracks.length >= 100,
     importedAt: new Date().toISOString(),
-    note: `Imported ${tracks.length} songs visible in Spotify's public embed. Spotify may truncate large playlists. Year and genre are unknown until resolved; use CSV for complete metadata.`,
+    note: `Imported ${tracks.length} songs visible in Spotify's public embed.${tracks.length >= 100 ? " This may be only the first 100 songs. Import a complete CSV export for the rest." : ""} Year and genre metadata are not included.`,
   };
 }
 
@@ -121,6 +123,15 @@ export function parseCSV(csv, name = "Imported playlist") {
     } else deduped.set(key, track);
   }
   const unique = [...deduped.values()];
+  const playlistIds = rows.map((row) =>
+    spotifyPlaylistId(field(row, ["playlisturl", "playlisturi"])),
+  );
+  const playlistId =
+    playlistIds.length &&
+    playlistIds[0] &&
+    playlistIds.every((id) => id === playlistIds[0])
+      ? playlistIds[0]
+      : null;
   if (!unique.length)
     throw new Error(
       "CSV needs Title and Artist columns (Track Name and Artist Name(s) are also supported).",
@@ -128,6 +139,11 @@ export function parseCSV(csv, name = "Imported playlist") {
   return {
     id: randomUUID(),
     name: name.slice(0, 100),
+    importMethod: "csv",
+    possiblyTruncated: false,
+    ...(playlistId
+      ? { spotifyUrl: `https://open.spotify.com/playlist/${playlistId}` }
+      : {}),
     tracks: unique,
     importedAt: new Date().toISOString(),
     note: `Imported ${unique.length} songs. ${unique.filter((t) => t.year == null).length} have no year metadata.`,

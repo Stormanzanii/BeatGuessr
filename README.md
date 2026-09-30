@@ -73,13 +73,17 @@ Use `npm run dev` to restart the server automatically when server files change. 
 
 ## Play
 
-Press Play, then type a title or choose a suggestion. Enter submits your guess. Skip, beside the textbox, advances through the clip lengths. At 15 seconds it reveals the answer. You can also choose a clip length directly. Correct answers animate the record and release confetti in five overlapping bursts across the screen for 12 seconds. The saved slider under Audio & celebration settings runs from 1× (1,500 pieces) to 20× (30,000 pieces); the default 6× keeps the previous 9,000-piece celebration. Reduced-motion preferences use a smaller, shorter celebration.
+Press Play, then type a title or choose a suggestion. Suggestions combine the wider Deezer catalog, with Apple Music as a fallback, and matching songs from your selected sources. Exact playlist title matches appear first, including tracks missing from the external catalog. If external search is unavailable, matching playlist songs still appear and you can enter a title directly. Enter submits your guess. Skip, beside the textbox, advances through the clip lengths. At 15 seconds it reveals the answer. You can also choose a clip length directly.
+
+Correct answers animate the record and release confetti. The saved slider under Audio & celebration settings runs from 1× (1,500 pieces for two seconds) to 20× (30,000 pieces). Duration increases by two seconds per multiplier and caps at 12 seconds; the default is 6×. Reduced-motion preferences use a smaller, shorter celebration.
 
 Open Sources and check one or more collections. Press Apply & new song to shuffle their combined pool. Overlapping songs are deduplicated, so the same song appearing in two playlists does not receive double the chance of selection. Genre and year controls are under Genre & release years. The app avoids recently served songs until the selected pool is exhausted.
 
 A correct guess automatically plays a 30-second snippet alongside the celebration. Shorter previews or local files play their available duration. Use the play button to stop or replay the snippet; Next song stops it immediately. A late random starting point shifts back when needed to leave room for the full snippet. Revealing an unsolved song does not trigger automatic playback.
 
 ## Music sources
+
+The revealed answer shows which selected source supplied the song: the playlist name, Built-in songs, or Local audio. A song shared by multiple selected sources lists each source once. Deezer or Apple Music listening links identify the audio provider separately.
 
 - **Built-in songs:** 233 hand-selected tracks with original release years, plus the locally expanded catalog. Manage imports & more songs → Get more built-in songs fetches popular tracks for the built-in artists and their album dates from Deezer. The expanded catalog is saved in `data/expanded-catalog.json`. These additional dates describe the provider's album edition and can be reissue dates. Genre is inherited from the seed artist category.
 - **Public Spotify playlists:** paste a playlist URL, URI, or ID. The importer reads the metadata exposed by Spotify's public embed. Embeds can stop at 100 tracks and do not guarantee the complete playlist. They generally omit release years and genres. This is not an official Spotify Web API integration.
@@ -106,7 +110,15 @@ spicetify config extensions beatguessr-export.js
 spicetify apply
 ```
 
-Then right-click a playlist in Spotify and choose **Export for BeatGuessr**. Import the downloaded CSV here. Applying Spicetify can restart Spotify. This optional integration has not been validated in a live Spotify session; its internal API can change between Spotify versions.
+Then right-click a playlist in Spotify and choose **Export for BeatGuessr**. Import the downloaded CSV here. The exporter reads successive pages, including when Spotify returns fewer entries than requested. It supports up to 10,000 entries and stops with an error if pages repeat or end before the reported total. It includes the original playlist URL, so importing its CSV replaces the matching partial Spotify import while keeping the source selected.
+
+Applying Spicetify can restart Spotify. Pagination is covered by automated tests, including a 350-song playlist, but this optional integration has not been validated in a live Spotify session; its internal API can change between Spotify versions.
+
+### Why pasted Spotify links can stop at 100 songs
+
+The public embed used by link imports returns at most 100 tracks for the large playlists tested. Adding `offset=100&limit=100` returned the same first 100 tracks, and the embed supplied no next-page link or total count. The app marks these imports as potentially incomplete. Its CSV importer accepts up to 10,000 songs; the game pool itself has no 100-song limit.
+
+For a complete playlist, install the Spicetify exporter above, export from the desktop app, then choose **Import Spotify playlist / CSV → Choose CSV file**. Spotify's separate [playlist items API](https://developer.spotify.com/documentation/web-api/reference/get-playlists-items) has authenticated pagination, but it is not used by the public-link importer.
 
 Spotify's [developer policy](https://developer.spotify.com/policy) prohibits games, including trivia. Its official Web API is therefore not used as the audio/game backend. Public embed parsing is an unofficial metadata import path and is not a statement of Spotify approval. CSV and local-file imports remain independent of that parser.
 

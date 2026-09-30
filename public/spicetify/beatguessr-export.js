@@ -13,13 +13,36 @@
       const api = Spicetify.Platform.PlaylistAPI;
       const metadata = await api.getMetadata(uri);
       const rows = [],
-        seen = new Set();
+        seen = new Set(),
+        pages = new Set();
       let offset = 0;
-      while (offset < 20000) {
-        const result = await api.getContents(uri, { offset, limit: 200 });
+      let expectedTotal = metadata.totalLength;
+      while (true) {
+        const result = await api.getContents(uri, { offset, limit: 100 });
+        expectedTotal = result.totalLength ?? result.total ?? expectedTotal;
+        if (typeof expectedTotal === "number" && expectedTotal > 10000)
+          throw new Error("Export supports up to 10,000 playlist entries.");
         const items = result.items || [];
-        if (!items.length) break;
-        let added = 0;
+        if (!items.length) {
+          if (typeof expectedTotal === "number" && offset < expectedTotal)
+            throw new Error(
+              `Spotify stopped at ${offset} of ${expectedTotal} entries. Try the export again.`,
+            );
+          break;
+        }
+        if (offset + items.length > 10000)
+          throw new Error("Export supports up to 10,000 playlist entries.");
+        const signature = JSON.stringify(
+          items.map((item) => [
+            item.uid,
+            (item.track || item).uri || (item.track || item).link,
+          ]),
+        );
+        if (pages.has(signature))
+          throw new Error(
+            "Spotify repeated a page. Export stopped to avoid saving an incomplete playlist.",
+          );
+        pages.add(signature);
         for (const item of items) {
           const track = item.track || item;
           const id = track.uri || track.link;
@@ -44,23 +67,22 @@
             /^\d{4}/.test(String(release)) ? String(release).slice(0, 4) : "",
             "",
             id,
+            `https://open.spotify.com/playlist/${uri.split(":")[2]}`,
           ]);
           seen.add(id);
-          added++;
         }
         offset += items.length;
-        const total =
-          result.totalLength ?? result.total ?? metadata.totalLength;
-        if (typeof total === "number" && offset >= total) break;
-        if (items.length < 200) break;
-        if (!added)
-          throw new Error(
-            "Spotify did not return the next page. Export stopped to avoid silently truncating the playlist.",
-          );
+        Spicetify.showNotification(
+          `Reading playlist: ${offset}${typeof expectedTotal === "number" ? ` / ${expectedTotal}` : ""} entries…`,
+        );
+        if (typeof expectedTotal === "number" && offset >= expectedTotal) break;
       }
       if (!rows.length)
         throw new Error("No song metadata returned by this Spotify version.");
-      const csv = [["Title", "Artist", "Year", "Genre", "Track URI"], ...rows]
+      const csv = [
+        ["Title", "Artist", "Year", "Genre", "Track URI", "Playlist URL"],
+        ...rows,
+      ]
         .map((row) => row.map(csvCell).join(","))
         .join("\r\n");
       const url = URL.createObjectURL(
