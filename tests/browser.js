@@ -137,10 +137,11 @@ try {
   assert.equal(await page.evaluate(() => beatguessr.state.stage), 1);
   console.log("Skip button beside textbox advances the clip.");
   await page.locator("#give-up").click();
+  await page.waitForFunction(() => beatguessr.player.playing);
   assert.equal(
-    await page.evaluate(() => beatguessr.player.playing),
-    false,
-    "Revealing an unsolved song must not autoplay the reward",
+    await page.evaluate(() => beatguessr.player.lastSchedule.seconds),
+    await page.evaluate(() => Math.min(30, beatguessr.player.buffer.duration)),
+    "Revealing an unsolved song also plays the full snippet",
   );
 
   await page.locator(".filter-settings > summary").click();

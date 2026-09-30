@@ -74,8 +74,8 @@ function message(text, kind = "") {
   $("message").className = `message ${kind}`;
 }
 function playbackLabel(playing = player.playing) {
-  if (playing) return state.won ? "Stop snippet" : "Listening…";
-  if (state.won) {
+  if (playing) return state.done ? "Stop snippet" : "Listening…";
+  if (state.done) {
     const seconds = Math.round(Math.min(30, player.buffer.duration) * 10) / 10;
     return `Replay ${seconds}s snippet`;
   }
@@ -214,7 +214,7 @@ function showReveal(won) {
   $("listen-caption").textContent = won
     ? "Some songs just stay with you."
     : "Now that sounds familiar.";
-  if (won) void play();
+  void play();
 }
 
 async function newRound() {
@@ -553,7 +553,7 @@ async function play() {
   if (state.loading || !state.track) return;
   if (player.playing) return player.stop();
   try {
-    if (state.won) {
+    if (state.done) {
       // Shift a late random start back so the reward can use the full 30 seconds.
       const offset = Math.min(
         player.offset,
