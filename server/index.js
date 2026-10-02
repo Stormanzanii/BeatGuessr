@@ -344,9 +344,33 @@ export const server = createServer(async (req, res) => {
       );
       if (!seed)
         return json(res, 404, { error: "Song not found in your library." });
+      const track = await resolveSong(seed, input.failedSource);
+      // Serve covers through this server so a player's network or ad blocker
+      // can't block the Deezer/Apple CDN, as lobbies already do.
       return json(res, 200, {
-        track: await resolveSong(seed, input.failedSource),
+        track: {
+          ...track,
+          cover: track.cover
+            ? `/api/artwork/${encodeURIComponent(track.id)}`
+            : undefined,
+        },
       });
+    }
+    if (req.method === "GET" && url.pathname.startsWith("/api/artwork/")) {
+      const song = media.get(
+        decodeURIComponent(url.pathname.slice("/api/artwork/".length)),
+      );
+      const artwork = song && (await fetchArtwork(song).catch(() => null));
+      if (!artwork) {
+        res.writeHead(404, { "Cache-Control": "no-store" });
+        return res.end();
+      }
+      res.writeHead(200, {
+        "Content-Type": artwork.type,
+        "Content-Length": artwork.bytes.length,
+        "Cache-Control": "private, max-age=300",
+      });
+      return res.end(artwork.bytes);
     }
     if (req.method === "GET" && url.pathname.startsWith("/api/audio/")) {
       const id = decodeURIComponent(url.pathname.slice("/api/audio/".length));
