@@ -3,14 +3,14 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#0c0e0b" />
+    <meta name="theme-color" content="#0a0c0e" />
     <title>Play with friends · BeatGuessr</title>
     <link rel="icon" href="/icon.svg" type="image/svg+xml" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
       rel="stylesheet"
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&family=JetBrains+Mono:wght@400..700&display=swap"
     />
     <link rel="stylesheet" href="/style.css" />
     <link rel="stylesheet" href="/layout.css" />
@@ -19,22 +19,25 @@
   </head>
   <body>
     <header class="topbar">
-      <a class="brand" href="/"
-        ><span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span
-        ><span class="brand-name">BeatGuessr</span></a
-      >
-      <div class="top-actions">
-        <span id="connection" class="connection" role="status">Offline</span>
-        <nav class="nav-tabs" aria-label="Game mode">
-          <a href="/">Solo</a
-          ><a href="/lobby" aria-current="page">With friends</a>
+      <div class="topbar-inner">
+        <div class="topbar-left">
+          <a class="brand" href="/" aria-label="BeatGuessr home"
+            ><svg class="brand-mark" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2.5"/><circle cx="12" cy="12" r="3.5" fill="currentColor"/></svg
+            ><span>BeatGuessr</span></a
+          >
+          <span id="connection" class="slate connection" role="status"></span>
+        </div>
+        <nav class="nav-links" aria-label="Game mode">
+          <a class="slate" href="/">Solo</a
+          ><a class="slate" href="/lobby" aria-current="page">With friends</a>
         </nav>
+        <span class="topbar-spacer" aria-hidden="true"></span>
       </div>
     </header>
     <main class="lobby-shell">
       <section id="setup" class="panel lobby-setup">
         <div class="eyebrow">Multiplayer</div>
-        <h1>Bring the whole room.</h1>
+        <h1 class="display">Bring the whole room.</h1>
         <p class="muted">
           Replay clips at your own pace. Everyone guesses. Vote together for a
           longer clip.
@@ -100,7 +103,7 @@
           <div class="room-heading">
             <div>
               <div class="eyebrow">Room <span id="code-label" class="room-code"></span></div>
-              <h1 id="round-title">Ready when you are.</h1>
+              <h1 id="round-title" class="display">Ready when you are.</h1>
             </div>
             <button id="copy-invite" class="button outlined">
               Copy invite
