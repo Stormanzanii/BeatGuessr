@@ -1,6 +1,8 @@
 // Visual themes. Each theme is one stylesheet in /themes/ laid over base.css.
 // The inline script in each page's <head> applies the saved theme before the
 // first paint, so keep its list in step with THEMES.
+import { ambientBackdrop } from "./ambient.js";
+
 export const THEMES = ["spicy", "sleeve", "broadcast", "neon"];
 const KEY = "beatguessr:theme";
 
@@ -39,6 +41,7 @@ export function applyTheme(theme) {
 }
 
 export function setupThemePicker(select) {
+  ambientBackdrop();
   if (!select) return;
   select.value = savedTheme();
   select.addEventListener("change", () => applyTheme(select.value));
@@ -46,35 +49,8 @@ export function setupThemePicker(select) {
 
 // The backdrop some themes paint from album art. Only ever set from a song
 // whose answer is already showing, so it never gives the current one away.
-// The new cover gets its own backdrop, laid over the old one and faded in
-// once the image is decoded; the old one goes only after that. Swapping the
-// image on a single backdrop left a frame with nothing painted, which
-// showed as the whole page blinking black.
-let ambientRequest = 0;
-export async function setAmbientCover(url) {
-  if (!url) return;
-  const request = ++ambientRequest;
-  const image = new Image();
-  image.src = url;
-  try {
-    await image.decode();
-  } catch {
-    return;
-  }
-  if (request !== ambientRequest) return;
-  const current = document.querySelector(".ambient:not(.leaving)");
-  if (!current) return;
-  const next = current.cloneNode(true);
-  next.style.setProperty("--ambient-cover", `url(${JSON.stringify(url)})`);
-  next.classList.add("entering");
-  current.after(next);
-  current.classList.add("leaving");
-  document.documentElement.dataset.ambient = "cover";
-  // Two frames: one to paint it transparent, one to start the fade.
-  requestAnimationFrame(() =>
-    requestAnimationFrame(() => next.classList.remove("entering")),
-  );
-  setTimeout(() => current.remove(), 1600);
+export function setAmbientCover(url) {
+  if (url) ambientBackdrop()?.setCover(url);
 }
 
 // Playback progress as a 0-1 custom property, for themes that fill text

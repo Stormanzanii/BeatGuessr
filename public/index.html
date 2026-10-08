@@ -4,6 +4,10 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#16121a" />
+    <!-- The page is dark already: stop dark-mode extensions and the browser's
+         auto-dark from recolouring it (they washed the record out white). -->
+    <meta name="color-scheme" content="dark light" />
+    <meta name="darkreader-lock" />
     <title>BeatGuessr</title>
     <link rel="icon" href="/icon.svg" type="image/svg+xml" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -26,9 +30,7 @@
   </head>
   <body>
     <div class="ambient" aria-hidden="true">
-      <div class="ambient-layer"></div>
-      <div class="ambient-layer"></div>
-      <div class="ambient-layer"></div>
+      <canvas class="ambient-canvas"></canvas>
     </div>
     <header class="topbar">
       <div class="topbar-inner">
