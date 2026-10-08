@@ -47,10 +47,16 @@ export function setupThemePicker(select) {
 // The backdrop some themes paint from album art. Only ever set from a song
 // whose answer is already showing, so it never gives the current one away.
 export function setAmbientCover(url) {
-  const root = document.documentElement;
   if (!url) return;
-  root.style.setProperty("--ambient-cover", `url(${JSON.stringify(url)})`);
-  root.dataset.ambient = "cover";
+  // Swap only once the image is in hand: swapping first left the backdrop
+  // empty, and the whole page went black, until it downloaded.
+  const image = new Image();
+  image.onload = () => {
+    const root = document.documentElement;
+    root.style.setProperty("--ambient-cover", `url(${JSON.stringify(url)})`);
+    root.dataset.ambient = "cover";
+  };
+  image.src = url;
 }
 
 // Playback progress as a 0-1 custom property, for themes that fill text

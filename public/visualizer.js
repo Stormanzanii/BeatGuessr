@@ -71,7 +71,8 @@ export class RecordVisualizer {
     const usable = this.bins.length * 0.7;
     for (let i = 0; i < half; i++) {
       const bin = Math.floor(Math.pow(i / half, 1.6) * usable);
-      const value = this.bins[bin] / 255;
+      // Curved so quiet bins stay short and only real peaks reach full height.
+      const value = Math.pow(this.bins[bin] / 255, 1.7);
       this.levels[i] = Math.max(value, this.levels[i] * DECAY);
       this.levels[BARS - 1 - i] = this.levels[i];
     }

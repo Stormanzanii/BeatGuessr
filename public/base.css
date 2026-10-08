@@ -107,6 +107,11 @@ p {
   z-index: 1;
 }
 
+/* Dark under the cover while it downloads, never a white disc. */
+.record-art {
+  background: #111;
+}
+
 .theme-picker {
   display: inline-flex;
   align-items: center;

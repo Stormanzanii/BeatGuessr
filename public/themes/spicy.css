@@ -130,10 +130,6 @@ a {
   animation-duration: 64s;
   animation-direction: reverse;
 }
-/* A new cover fades the backdrop up from black. */
-:root[data-ambient="cover"] .ambient {
-  animation: bg-in 1.6s ease both;
-}
 
 /* ---------------------------------------------------------------------------
    Type
@@ -187,12 +183,13 @@ kbd {
 /* ---------------------------------------------------------------------------
    Glass surfaces
    --------------------------------------------------------------------------- */
+/* No backdrop blur on the big surfaces: the backdrop is already blurred,
+   and Chrome left stale black tiles where a blurred panel sat over the
+   moving background. Pop-ups and dialogs keep theirs. */
 .panel,
 .topbar,
 .lobby-setup {
   background: var(--glass);
-  -webkit-backdrop-filter: var(--glass-blur);
-  backdrop-filter: var(--glass-blur);
   box-shadow: var(--liquid-edge), var(--liquid-cast);
 }
 
@@ -2478,7 +2475,7 @@ footer {
   .reveal {
     align-items: flex-start;
     text-align: left;
-    margin: 18px 0 0;
+    margin: 18px 0 28px;
   }
   #reveal-links {
     justify-content: flex-start;

@@ -18,6 +18,9 @@ export class ClipPlayer {
     this.analyser = this.context.createAnalyser();
     this.analyser.fftSize = 512;
     this.analyser.smoothingTimeConstant = 0.78;
+    // A wide range so loud masters don't pin every bar at the top.
+    this.analyser.minDecibels = -90;
+    this.analyser.maxDecibels = -8;
     this.analyser.connect(this.gain);
     this.gain.connect(this.context.destination);
   }
