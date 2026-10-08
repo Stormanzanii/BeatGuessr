@@ -93,6 +93,13 @@ a {
   transform-origin: 0 0;
   pointer-events: none;
 }
+/* A new cover's backdrop fades in over the old one (see theme.js). */
+.ambient {
+  transition: opacity 1.2s ease;
+}
+.ambient.entering {
+  opacity: 0;
+}
 .ambient::after {
   content: "";
   position: absolute;

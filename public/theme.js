@@ -46,17 +46,35 @@ export function setupThemePicker(select) {
 
 // The backdrop some themes paint from album art. Only ever set from a song
 // whose answer is already showing, so it never gives the current one away.
-export function setAmbientCover(url) {
+// The new cover gets its own backdrop, laid over the old one and faded in
+// once the image is decoded; the old one goes only after that. Swapping the
+// image on a single backdrop left a frame with nothing painted, which
+// showed as the whole page blinking black.
+let ambientRequest = 0;
+export async function setAmbientCover(url) {
   if (!url) return;
-  // Swap only once the image is in hand: swapping first left the backdrop
-  // empty, and the whole page went black, until it downloaded.
+  const request = ++ambientRequest;
   const image = new Image();
-  image.onload = () => {
-    const root = document.documentElement;
-    root.style.setProperty("--ambient-cover", `url(${JSON.stringify(url)})`);
-    root.dataset.ambient = "cover";
-  };
   image.src = url;
+  try {
+    await image.decode();
+  } catch {
+    return;
+  }
+  if (request !== ambientRequest) return;
+  const current = document.querySelector(".ambient:not(.leaving)");
+  if (!current) return;
+  const next = current.cloneNode(true);
+  next.style.setProperty("--ambient-cover", `url(${JSON.stringify(url)})`);
+  next.classList.add("entering");
+  current.after(next);
+  current.classList.add("leaving");
+  document.documentElement.dataset.ambient = "cover";
+  // Two frames: one to paint it transparent, one to start the fade.
+  requestAnimationFrame(() =>
+    requestAnimationFrame(() => next.classList.remove("entering")),
+  );
+  setTimeout(() => current.remove(), 1600);
 }
 
 // Playback progress as a 0-1 custom property, for themes that fill text
