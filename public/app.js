@@ -66,6 +66,7 @@ const player = new ClipPlayer(
   },
   (playing) => {
     $("record")?.classList.toggle("spinning", playing);
+    document.body.classList.toggle("is-playing", playing);
     $("play-icon").textContent = playing ? "Ⅱ" : "▶";
     if (!state.loading) $("play-text").textContent = playbackLabel(playing);
   },
@@ -236,11 +237,19 @@ function setStage(index) {
   $("skip-button").innerHTML =
     index === 4 ? "Reveal <span>↗</span>" : "Skip <span>↗</span>";
 }
+function setStat(id, value) {
+  const element = $(id);
+  if (element.textContent === String(value)) return;
+  element.textContent = value;
+  // Restart the bump animation on every change.
+  element.classList.remove("bump");
+  void element.offsetWidth;
+  element.classList.add("bump");
+}
 function updateStats() {
-  $("stat-solved").textContent = state.stats.solved;
-  $("stat-streak").textContent = state.stats.streak;
-  $("stat-best").textContent =
-    state.stats.best == null ? "—" : `${state.stats.best}s`;
+  setStat("stat-solved", state.stats.solved);
+  setStat("stat-streak", state.stats.streak);
+  setStat("stat-best", state.stats.best == null ? "—" : `${state.stats.best}s`);
 }
 function updateRecent() {
   const list = $("recent-tracks");
@@ -692,6 +701,15 @@ function submitGuess(title, candidate) {
   const entry = document.createElement("span");
   entry.textContent = `× ${title}`;
   $("guess-history").append(entry);
+  const wrapper = $("guess").closest(".guess-wrapper");
+  wrapper.classList.remove("shake");
+  void wrapper.offsetWidth;
+  wrapper.classList.add("shake");
+  wrapper.addEventListener(
+    "animationend",
+    () => wrapper.classList.remove("shake"),
+    { once: true },
+  );
   message("Not that one. Try a little more audio.");
   advance();
 }

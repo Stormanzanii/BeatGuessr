@@ -3,28 +3,49 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#161616" />
+    <meta name="theme-color" content="#0c0e0b" />
     <title>BeatGuessr</title>
     <link rel="icon" href="/icon.svg" type="image/svg+xml" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap"
+    />
     <link rel="stylesheet" href="/style.css" />
     <link rel="stylesheet" href="/layout.css" />
     <script type="module" src="/app.js"></script>
   </head>
   <body>
     <header class="topbar">
-      <a class="brand" href="/">BeatGuessr</a>
+      <a class="brand" href="/"
+        ><span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span
+        ><span class="brand-name">BeatGuessr</span></a
+      >
       <div class="top-actions">
-        <a href="/lobby" class="text-button">Play with friends</a>
-        <span class="local-badge">Solo</span
-        ><button id="help-button" class="text-button">How to play</button>
+        <nav class="nav-tabs" aria-label="Game mode">
+          <a href="/" aria-current="page">Solo</a
+          ><a href="/lobby">With friends</a>
+        </nav>
+        <button id="help-button" class="help-button" type="button">
+          <span aria-hidden="true">?</span
+          ><b class="help-text">How to play</b>
+        </button>
       </div>
     </header>
     <main class="workspace">
-      <aside class="library panel">
-        <div class="eyebrow">THE COLLECTION</div>
-        <h2>Your music.</h2>
-        <p class="muted intro-copy">Mix playlists. Find your next track.</p>
-        <label class="field-label" id="source-label">Sources</label>
+      <aside class="library panel" aria-labelledby="library-heading">
+        <div class="panel-header">
+          <div>
+            <div class="eyebrow">Library</div>
+            <h2 id="library-heading">Your music</h2>
+          </div>
+          <span class="panel-icon" aria-hidden="true"
+            ><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg
+          ></span>
+        </div>
+        <div class="section-title">Play from</div>
+        <span class="field-label" id="source-label" hidden>Sources</span>
         <div class="source-picker">
           <button
             id="source-button"
@@ -49,8 +70,8 @@
             <option value="alternating">Back and forth</option>
           </select>
         </div>
-        <p class="muted small">
-          Equal chances, or take turns between playlists. Applies from the next song.
+        <p class="muted small mode-hint">
+          Equal chances, or take turns between playlists.
         </p>
         <details class="filter-settings">
           <summary>Genre & release years</summary>
@@ -83,12 +104,12 @@
             </div>
           </div>
           <div class="decades" aria-label="Quick year filters">
-            <button data-decade="all" class="selected">All years</button
-            ><button data-decade="1980">1980s</button
-            ><button data-decade="1990">1990s</button
-            ><button data-decade="2000">2000s</button
-            ><button data-decade="2010">2010s</button
-            ><button data-decade="2020">2020s</button>
+            <button data-decade="all" class="selected">All</button
+            ><button data-decade="1980">80s</button
+            ><button data-decade="1990">90s</button
+            ><button data-decade="2000">00s</button
+            ><button data-decade="2010">10s</button
+            ><button data-decade="2020">20s</button>
           </div>
         </details>
         <div class="filter-actions">
@@ -97,10 +118,13 @@
             Apply & new song
           </button>
         </div>
+        <div class="section-title">Add music</div>
         <div class="import-actions">
           <button id="import-button" class="button outlined">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h7M3 6h.01M3 12h.01M3 18h.01"/></svg>
             Import Spotify playlist / CSV</button
           ><label class="button outlined" for="local-files"
+            ><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg
             >Add local audio</label
           ><input
             id="local-files"
@@ -113,12 +137,12 @@
         <p class="muted small" id="library-cache-status" role="status">
           Imports and local audio are saved in this browser.
         </p>
-        <p class="muted small">
-          Use filenames like “Artist - Title.mp3”. Remove saved files under Manage imports.
-        </p>
         <details class="manage-sources">
           <summary>Manage imports</summary>
           <div id="playlist-management"></div>
+          <p class="muted small">
+            Name local files like “Artist - Title.mp3”.
+          </p>
           <p class="muted small">
             Spicetify users: export a complete playlist from the Spotify desktop
             app.
@@ -137,250 +161,77 @@
       </aside>
       <section class="game panel" aria-labelledby="game-heading">
         <div class="game-heading">
-          <h1 id="game-heading">Name that track.</h1>
+          <h1 id="game-heading">Name that track</h1>
           <span id="round-number" class="round-badge">Round 1</span>
         </div>
         <p class="instructions">
-          Play a clip, then enter the song title. Skip to hear more.
+          Play a clip, then type the song title. Skip to hear more.
         </p>
         <div class="record-scene" id="record-scene">
-          <div class="record" id="record">
-            <svg viewBox="0 0 300 300" aria-hidden="true">
-              <circle
-                cx="150"
-                cy="150"
-                r="146"
-                fill="#111410"
-                stroke="#49503f"
-              />
-              <circle
-                cx="150"
-                cy="150"
-                r="140"
-                fill="none"
-                stroke="#343b30"
-                stroke-width=".7"
-              />
-              <circle
-                cx="150"
-                cy="150"
-                r="136.9"
-                fill="none"
-                stroke="#282e27"
-                stroke-width=".7"
-              />
-              <circle
-                cx="150"
-                cy="150"
-                r="133.8"
-                fill="none"
-                stroke="#282e27"
-                stroke-width=".7"
-              />
-              <circle
-                cx="150"
-                cy="150"
-                r="130.7"
-                fill="none"
-                stroke="#343b30"
-                stroke-width=".7"
-              />
-              <circle
-                cx="150"
-                cy="150"
-                r="127.6"
-                fill="none"
-                stroke="#282e27"
-                stroke-width=".7"
-              />
-              <circle
-                cx="150"
-                cy="150"
-                r="124.5"
-                fill="none"
-                stroke="#282e27"
-                stroke-width=".7"
-              />
-              <circle
-                cx="150"
-                cy="150"
-                r="121.4"
-                fill="none"
-                stroke="#343b30"
-                stroke-width=".7"
-              />
-              <circle
-                cx="150"
-                cy="150"
-                r="118.3"
-                fill="none"
-                stroke="#282e27"
-                stroke-width=".7"
-              />
-              <circle
-                cx="150"
-                cy="150"
-                r="115.2"
-                fill="none"
-                stroke="#282e27"
-                stroke-width=".7"
-              />
-              <circle
-                cx="150"
-                cy="150"
-                r="112.1"
-                fill="none"
-                stroke="#343b30"
-                stroke-width=".7"
-              />
-              <circle
-                cx="150"
-                cy="150"
-                r="109"
-                fill="none"
-                stroke="#282e27"
-                stroke-width=".7"
-              />
-              <circle
-                cx="150"
-                cy="150"
-                r="105.9"
-                fill="none"
-                stroke="#282e27"
-                stroke-width=".7"
-              />
-              <circle
-                cx="150"
-                cy="150"
-                r="102.8"
-                fill="none"
-                stroke="#343b30"
-                stroke-width=".7"
-              />
-              <circle
-                cx="150"
-                cy="150"
-                r="99.69999999999999"
-                fill="none"
-                stroke="#282e27"
-                stroke-width=".7"
-              />
-              <circle
-                cx="150"
-                cy="150"
-                r="96.6"
-                fill="none"
-                stroke="#282e27"
-                stroke-width=".7"
-              />
-              <circle
-                cx="150"
-                cy="150"
-                r="93.5"
-                fill="none"
-                stroke="#343b30"
-                stroke-width=".7"
-              />
-              <circle
-                cx="150"
-                cy="150"
-                r="90.4"
-                fill="none"
-                stroke="#282e27"
-                stroke-width=".7"
-              />
-              <circle
-                cx="150"
-                cy="150"
-                r="87.3"
-                fill="none"
-                stroke="#282e27"
-                stroke-width=".7"
-              />
-              <circle
-                cx="150"
-                cy="150"
-                r="84.19999999999999"
-                fill="none"
-                stroke="#343b30"
-                stroke-width=".7"
-              />
-              <circle
-                cx="150"
-                cy="150"
-                r="81.1"
-                fill="none"
-                stroke="#282e27"
-                stroke-width=".7"
-              />
-              <circle
-                cx="150"
-                cy="150"
-                r="78"
-                fill="none"
-                stroke="#282e27"
-                stroke-width=".7"
-              />
-              <circle
-                cx="150"
-                cy="150"
-                r="74.89999999999999"
-                fill="none"
-                stroke="#343b30"
-                stroke-width=".7"
-              />
-              <circle
-                cx="150"
-                cy="150"
-                r="71.8"
-                fill="none"
-                stroke="#282e27"
-                stroke-width=".7"
-              />
-              <circle cx="150" cy="150" r="55" fill="#bee56c" />
-              <text
-                id="record-label-title"
-                x="150"
-                y="132"
-                text-anchor="middle"
-                fill="#26341a"
-                font-size="12"
-                font-family="sans-serif"
-                font-weight="700"
-                letter-spacing="2"
-              >
-                BEATGUESSR
-              </text>
-              <text
-                id="record-label-subtitle"
-                x="150"
-                y="144"
-                text-anchor="middle"
-                fill="#26341a"
-                font-size="6"
-                font-family="sans-serif"
-                letter-spacing="1"
-              >
-                SIDE A · UNKNOWN TRACK
-              </text>
-              <circle cx="150" cy="158" r="6" fill="#141714" />
-              <text
-                id="record-label-footer"
-                x="150"
-                y="180"
-                text-anchor="middle"
-                fill="#26341a"
-                font-size="6"
-                font-family="sans-serif"
-                letter-spacing="1"
-              >
-                LISTEN CLOSELY
-              </text>
-            </svg>
-            <div id="record-art" class="record-art" hidden>
-              <img id="reveal-cover" alt="" />
-              <span class="record-spindle" aria-hidden="true"></span>
+          <div class="record-stage">
+            <div class="record" id="record">
+              <svg viewBox="0 0 300 300" aria-hidden="true">
+                <defs>
+                  <radialGradient id="vinyl" cx="50%" cy="50%" r="50%">
+                    <stop offset="0" stop-color="#1b2018" />
+                    <stop offset="1" stop-color="#0a0c09" />
+                  </radialGradient>
+                </defs>
+                <circle cx="150" cy="150" r="148" fill="url(#vinyl)" stroke="#2c3427" />
+                <circle cx="150" cy="150" r="138" fill="none" stroke="#ffffff0d" />
+                <circle cx="150" cy="150" r="128" fill="none" stroke="#ffffff08" />
+                <circle cx="150" cy="150" r="118" fill="none" stroke="#ffffff0d" />
+                <circle cx="150" cy="150" r="108" fill="none" stroke="#ffffff08" />
+                <circle cx="150" cy="150" r="98" fill="none" stroke="#ffffff0d" />
+                <circle cx="150" cy="150" r="88" fill="none" stroke="#ffffff08" />
+                <circle cx="150" cy="150" r="76" fill="none" stroke="#ffffff10" stroke-width="3" />
+                <circle cx="150" cy="150" r="58" fill="#c2f06b" />
+                <circle cx="150" cy="150" r="52" fill="none" stroke="#1a241033" />
+                <text
+                  id="record-label-title"
+                  x="150"
+                  y="132"
+                  text-anchor="middle"
+                  fill="#1a2410"
+                  font-size="12"
+                  font-family="Space Grotesk, sans-serif"
+                  font-weight="700"
+                  letter-spacing="2"
+                >
+                  BEATGUESSR
+                </text>
+                <text
+                  id="record-label-subtitle"
+                  x="150"
+                  y="144"
+                  text-anchor="middle"
+                  fill="#1a2410"
+                  font-size="6"
+                  font-family="Inter, sans-serif"
+                  letter-spacing="1"
+                >
+                  SIDE A · UNKNOWN TRACK
+                </text>
+                <circle cx="150" cy="158" r="6" fill="#0c0e0b" />
+                <text
+                  id="record-label-footer"
+                  x="150"
+                  y="180"
+                  text-anchor="middle"
+                  fill="#1a2410"
+                  font-size="6"
+                  font-family="Inter, sans-serif"
+                  letter-spacing="1"
+                >
+                  LISTEN CLOSELY
+                </text>
+              </svg>
+              <div id="record-art" class="record-art" hidden>
+                <img id="reveal-cover" alt="" />
+                <span class="record-spindle" aria-hidden="true"></span>
+              </div>
             </div>
+            <span class="record-sheen" aria-hidden="true"></span>
           </div>
         </div>
         <div id="reveal" class="reveal" hidden>
@@ -392,7 +243,7 @@
             <p id="reveal-source" hidden></p>
             <div id="reveal-links"></div>
           </div>
-          <button id="next-button" class="button primary">Next song</button>
+          <button id="next-button" class="button primary">Next song →</button>
         </div>
         <div id="listen-caption" class="listen-caption">
           How little do you need to hear?
@@ -420,7 +271,7 @@
             <div class="guess-wrapper">
               <input
                 id="guess"
-                placeholder="Song title"
+                placeholder="Type the song title…"
                 aria-label="Song title"
                 role="combobox"
                 aria-autocomplete="list"
@@ -454,13 +305,20 @@
         <div class="game-bottom">
           <button id="give-up" class="text-button" disabled>
             Reveal answer</button
-          ><button id="reroll" class="text-button">New song</button
+          ><button id="reroll" class="text-button">↻ New song</button
           ><span id="audio-source">Preview audio</span>
         </div>
       </section>
-      <aside class="session panel">
-        <div class="eyebrow">THIS SESSION</div>
-        <h2>Keep the streak.</h2>
+      <aside class="session panel" aria-labelledby="session-heading">
+        <div class="panel-header">
+          <div>
+            <div class="eyebrow">This session</div>
+            <h2 id="session-heading">Keep the streak</h2>
+          </div>
+          <span class="panel-icon" aria-hidden="true"
+            ><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.07-2.14-.22-4.05 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.15.43-2.29 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></svg
+          ></span>
+        </div>
         <div class="stats">
           <div><strong id="stat-solved">0</strong><span>Identified</span></div>
           <div>
@@ -470,10 +328,9 @@
         <div class="best-stat">
           <span>Fastest guess</span><strong id="stat-best">—</strong>
         </div>
-        <div class="panel-divider"></div>
-        <div class="field-label">Volume</div>
+        <div class="section-title">Playback</div>
         <div class="volume-label">
-          <span>Playback volume</span><span id="volume-value">60%</span>
+          <span>Volume</span><span id="volume-value">60%</span>
         </div>
         <input
           id="volume"
@@ -488,7 +345,7 @@
           ></label
         >
         <details class="settings">
-          <summary>Audio & celebration settings</summary>
+          <summary>More settings</summary>
           <label class="toggle-row" for="random-start"
             ><input
               id="random-start"
@@ -517,19 +374,19 @@
             </div>
           </div>
         </details>
-        <div class="panel-divider"></div>
-        <div class="field-label">Recently played</div>
+        <div class="section-title">Recently played</div>
         <div id="recent-tracks" class="recent-tracks">
-          <p class="muted">Completed songs appear here.</p>
+          <p class="muted">Finished songs show up here.</p>
         </div>
-        <div class="session-note">Space to play · Enter to guess</div>
+        <div class="session-note">
+          <span><kbd>Space</kbd> play</span
+          ><span><kbd>Enter</kbd> guess</span>
+        </div>
       </aside>
     </main>
     <footer>
-      <span>Space to play · Enter to guess</span
-      ><span>Preview excerpts. Import local files for song intros.</span>
+      <span>Songs play from preview excerpts. Add local files to hear intros.</span>
     </footer>
-
     <dialog id="import-dialog">
       <div class="dialog-heading">
         <h2>Import a playlist</h2>

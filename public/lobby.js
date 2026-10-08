@@ -37,6 +37,7 @@ const player = new ClipPlayer(
   (progress) => ($("room-progress").style.width = `${progress * 100}%`),
   (playing) => {
     $("lobby-record").classList.toggle("spinning", playing);
+    document.body.classList.toggle("is-playing", playing);
     updatePersonalPlayback();
   },
 );
@@ -113,6 +114,7 @@ function connect() {
   clearTimeout(reconnectTimer);
   clearInterval(pingTimer);
   $("connection").textContent = "Connecting…";
+  $("connection").dataset.state = "connecting";
   socket = new WebSocket(
     `${location.protocol === "https:" ? "wss:" : "ws:"}//${location.host}/ws/lobby`,
   );
@@ -136,6 +138,7 @@ function connect() {
       $("setup").hidden = true;
       $("room").hidden = false;
       $("connection").textContent = "Connected";
+      $("connection").dataset.state = "connected";
       error();
       readySentForRound = "";
     } else if (data.type === "state") {
@@ -178,6 +181,7 @@ function connect() {
     player.stop();
     playbackId = "";
     $("connection").textContent = "Disconnected";
+    $("connection").dataset.state = "disconnected";
     if (event.code === 4000) {
       stopped = true;
       error("This room was opened in another tab.");

@@ -3,9 +3,15 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#161616" />
+    <meta name="theme-color" content="#0c0e0b" />
     <title>Play with friends · BeatGuessr</title>
     <link rel="icon" href="/icon.svg" type="image/svg+xml" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap"
+    />
     <link rel="stylesheet" href="/style.css" />
     <link rel="stylesheet" href="/layout.css" />
     <link rel="stylesheet" href="/lobby.css" />
@@ -13,15 +19,21 @@
   </head>
   <body>
     <header class="topbar">
-      <a class="brand" href="/">BeatGuessr</a>
+      <a class="brand" href="/"
+        ><span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span
+        ><span class="brand-name">BeatGuessr</span></a
+      >
       <div class="top-actions">
-        <a class="text-button" href="/">Play solo</a
-        ><span id="connection" role="status">Play with friends</span>
+        <span id="connection" class="connection" role="status">Offline</span>
+        <nav class="nav-tabs" aria-label="Game mode">
+          <a href="/">Solo</a
+          ><a href="/lobby" aria-current="page">With friends</a>
+        </nav>
       </div>
     </header>
     <main class="lobby-shell">
       <section id="setup" class="panel lobby-setup">
-        <div class="eyebrow">YOUR MUSIC. YOUR PEOPLE.</div>
+        <div class="eyebrow">Multiplayer</div>
         <h1>Bring the whole room.</h1>
         <p class="muted">
           Replay clips at your own pace. Everyone guesses. Vote together for a
@@ -87,7 +99,7 @@
         <section class="panel room-game">
           <div class="room-heading">
             <div>
-              <div class="eyebrow">ROOM <span id="code-label"></span></div>
+              <div class="eyebrow">Room <span id="code-label" class="room-code"></span></div>
               <h1 id="round-title">Ready when you are.</h1>
             </div>
             <button id="copy-invite" class="button outlined">
@@ -105,7 +117,7 @@
             </div>
           </div>
           <div id="answer" class="room-answer" hidden>
-            <span class="eyebrow">MEET THE TRACK</span>
+            <span class="eyebrow">Meet the track</span>
             <h2 id="answer-title"></h2>
             <p id="answer-artist"></p>
             <p id="answer-meta" class="muted small"></p>
@@ -170,7 +182,7 @@
           ></p>
         </section>
         <aside class="panel room-sidebar">
-          <div class="eyebrow">THE LOBBY</div>
+          <div class="eyebrow">Players</div>
           <h2>Who knows this one?</h2>
           <p class="muted small">
             Earlier guesses earn more points. Answers stay private until the
