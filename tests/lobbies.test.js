@@ -282,8 +282,8 @@ test("lobby preloading balances unequal playlists even after the smaller one is 
     })),
   ];
   const hub = new LobbyHub(async (seed) => ({ track: seed }), { random: () => 0 });
-  const { room, player } = hub.create("Host", balancedPool, "owner", { balancePlaylists: true });
-  assert.equal(hub.snapshot(room, player).balancePlaylists, true);
+  const { room, player } = hub.create("Host", balancedPool, "owner", { playlistMode: "equal" });
+  assert.equal(hub.snapshot(room, player).playlistMode, "equal");
   let previous;
   for (let round = 0; round < 6; round++) {
     await hub.next(room);
@@ -292,7 +292,7 @@ test("lobby preloading balances unequal playlists even after the smaller one is 
     previous = room.round.seedId;
   }
   const normal = hub.create("Normal host", balancedPool, "normal-owner").room;
-  assert.equal(normal.balancePlaylists, false);
+  assert.equal(normal.playlistMode, "equal");
 });
 
 test("balanced lobbies try another playlist if the chosen source has no usable preview", async () => {
@@ -303,13 +303,32 @@ test("balanced lobbies try another playlist if the chosen source has no usable p
   let attempts = 0;
   const hub = new LobbyHub(async (seed) => {
     attempts++;
-    if (seed !== playable) throw new Error("No preview");
+    if (seed.id !== playable.id) throw new Error("No preview");
     return { track: seed };
   }, { random: () => 0 });
-  const { room } = hub.create("Host", [...failed, playable], "owner", { balancePlaylists: true });
+  const { room } = hub.create("Host", [...failed, playable], "owner", { playlistMode: "equal" });
   await room.preload.task;
   assert.equal(room.preload.asset.seedId, "playable");
   assert.equal(attempts, 2);
+});
+
+test("alternating lobbies advance their playlist turn only when a prepared round starts", async () => {
+  const turnPool = [
+    { id: "small-0", poolSources: [{ id: "small" }] },
+    ...Array.from({ length: 8 }, (_, index) => ({ id: `large-${index}`, poolSources: [{ id: "large" }] })),
+  ];
+  const hub = new LobbyHub(async (seed) => ({ track: seed }), { random: () => 0.9 });
+  const { room, player } = hub.create("Host", turnPool, "owner", { playlistMode: "alternating" });
+  assert.equal(hub.snapshot(room, player).playlistMode, "alternating");
+  await room.preload.task;
+  assert.equal(room.nextPlaylistId, undefined, "Warming a song does not consume a turn");
+  for (let round = 0; round < 6; round++) {
+    await hub.next(room);
+    assert.equal(room.round.track.selectedSourceId, round % 2 ? "large" : "small");
+    const next = room.nextPlaylistId;
+    await room.preload.task;
+    assert.equal(room.nextPlaylistId, next);
+  }
 });
 
 test("only the host's decoded audio sets a room's shared random point", async () => {

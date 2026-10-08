@@ -131,12 +131,12 @@ try {
   await host.locator('#lobby-sources input[value="curated"]').uncheck();
   await host.locator("#nickname").fill("Host");
   await host.locator("#room-random-start").check();
-  await host.locator("#room-balance-playlists").check();
+  await host.locator("#room-playlist-mode").selectOption("alternating");
   await host.locator(`#lobby-sources input[value="${playlist.id}"]`).check();
   await host.locator("#create-room").click();
   await host.locator("#room").waitFor();
-  await host.waitForFunction(() => beatguessrLobby.state.balancePlaylists === true);
-  assert.equal(await host.evaluate(() => JSON.parse(localStorage.getItem("beatguessr:settings")).balancePlaylists), true);
+  await host.waitForFunction(() => beatguessrLobby.state.playlistMode === "alternating");
+  assert.equal(await host.evaluate(() => JSON.parse(localStorage.getItem("beatguessr:settings")).playlistMode), "alternating");
   const code = await host.locator("#code-label").textContent();
   for (const [i, guest] of guests.entries()) {
     await guest.goto(`${base}/lobby/${code}`);
@@ -546,7 +546,7 @@ try {
       document.getElementById("reveal-cover").naturalWidth > 0,
   );
   const firstId = await host.evaluate(() => beatguessr.state.track.id);
-  assert.equal(await host.locator("#balance-playlists").isChecked(), false);
+  assert.equal(await host.locator("#playlist-mode").inputValue(), "equal");
   const nextId = soloPool.find((song) => song.id !== firstId).id;
   assert.equal(
     audioReads.get(nextId),
@@ -721,30 +721,39 @@ try {
   await host.evaluate((sources) => {
     const settings = JSON.parse(localStorage.getItem("beatguessr:settings"));
     localStorage.setItem("beatguessr:settings", JSON.stringify({
-      ...settings, sources, balancePlaylists: false,
+      ...settings, sources, playlistMode: "equal", nextPlaylistId: undefined,
     }));
   }, balanceIds);
   await host.reload();
   await host.waitForFunction(() => !beatguessr.state.loading && beatguessr.preloaded);
-  assert.equal(await host.evaluate(() => beatguessr.state.track.poolSources[0].id), balanceIds[1]);
-  await host.locator("#balance-playlists").check();
+  assert.equal(await host.evaluate(() => beatguessr.state.track.selectedSourceId), balanceIds[0]);
+  await host.locator("#playlist-mode").selectOption("alternating");
   await host.waitForFunction(() => beatguessr.preloaded);
   await host.locator("#reroll").click();
   await host.waitForFunction(() => !beatguessr.state.loading);
-  assert.equal(await host.evaluate(() => beatguessr.state.track.poolSources[0].id), balanceIds[0],
-    "Enabling balance replaces the queued song and selects the small playlist first for this random roll");
-  assert.equal(await host.evaluate(() => JSON.parse(localStorage.getItem("beatguessr:settings")).balancePlaylists), true);
+  assert.equal(await host.evaluate(() => beatguessr.state.track.selectedSourceId), balanceIds[1],
+    "Back and forth replaces the queued random song with the other playlist");
+  assert.equal(await host.evaluate(() => JSON.parse(localStorage.getItem("beatguessr:settings")).playlistMode), "alternating");
+  for (const sourceId of [balanceIds[0], balanceIds[1], balanceIds[0]]) {
+    await host.waitForFunction(() => beatguessr.preloaded);
+    await host.locator("#reroll").click();
+    await host.waitForFunction(() => !beatguessr.state.loading);
+    assert.equal(await host.evaluate(() => beatguessr.state.track.selectedSourceId), sourceId,
+      "Consecutive solo rounds take turns between unequal playlists");
+  }
   await host.screenshot({ path: "test-results/balanced-playlists.png", fullPage: true });
   await host.reload();
   await host.waitForFunction(() => !beatguessr.state.loading);
-  assert.equal(await host.locator("#balance-playlists").isChecked(), true,
-    "Equal playlist chances persist across refreshes");
-  await host.locator("#balance-playlists").uncheck();
-  assert.equal(await host.evaluate(() => beatguessr.state.balancePlaylists), false);
+  assert.equal(await host.locator("#playlist-mode").inputValue(), "alternating",
+    "The playlist mode persists across refreshes");
+  assert.equal(await host.evaluate(() => beatguessr.state.track.selectedSourceId), balanceIds[1],
+    "Refreshing preserves which playlist gets the next turn");
+  await host.locator("#playlist-mode").selectOption("equal");
+  assert.equal(await host.evaluate(() => beatguessr.state.playlistMode), "equal");
   await host.locator("#reroll").click();
   await host.waitForFunction(() => !beatguessr.state.loading);
-  assert.equal(await host.evaluate(() => beatguessr.state.track.poolSources[0].id), balanceIds[1],
-    "Disabling balance restores selection from the combined song pool");
+  assert.equal(await host.evaluate(() => beatguessr.state.track.selectedSourceId), balanceIds[0],
+    "50/50 uses equal playlist chances with this fixed random roll");
   assert.equal(errors.length, 0, errors.join("\n"));
   console.log(
     "Four-browser lobby passed: personal and shared playback, unanimous votes with 30s countdown, scores, 30s reveals, reconnects, wrong guesses, and audio/artwork preloading.",

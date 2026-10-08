@@ -56,7 +56,7 @@ window.beatguessrLobby = {
 $("room-code").value = code;
 $("nickname").value = stored("beatguessr:nickname", "");
 $("room-random-start").checked = settings.randomStart === true;
-$("room-balance-playlists").checked = settings.balancePlaylists === true;
+$("room-playlist-mode").value = settings.playlistMode === "alternating" ? "alternating" : "equal";
 $("room-volume").value = settings.volume ?? 60;
 player.setVolume(Number($("room-volume").value) / 100);
 function error(message = "") {
@@ -209,7 +209,7 @@ async function enter(create) {
           name,
           sources: selected,
           randomStart: $("room-random-start").checked,
-          balancePlaylists: $("room-balance-playlists").checked,
+          playlistMode: $("room-playlist-mode").value,
         }),
       });
       code = created.code;
@@ -220,7 +220,7 @@ async function enter(create) {
           ...stored("beatguessr:settings", {}),
           sources: selected,
           randomStart: $("room-random-start").checked,
-          balancePlaylists: $("room-balance-playlists").checked,
+          playlistMode: $("room-playlist-mode").value,
         }),
       );
     } else {
@@ -475,8 +475,8 @@ function render() {
   if (state.randomStart && round?.phase === "guessing" && round.offset != null)
     $("clip-status").textContent +=
       ` · Starts ${round.offset.toFixed(1)}s into the preview`;
-  if (state.balancePlaylists)
-    $("clip-status").textContent += " · Equal playlist chances";
+  $("clip-status").textContent += state.playlistMode === "alternating"
+    ? " · Back and forth" : " · 50/50";
   $("players").replaceChildren();
   for (const p of [...state.players].sort((a, b) => b.score - a.score)) {
     const row = document.createElement("div"),

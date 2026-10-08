@@ -167,7 +167,7 @@ export const server = createServer(async (req, res) => {
         owner,
         {
           randomStart: input.randomStart,
-          balancePlaylists: input.balancePlaylists,
+          playlistMode: input.playlistMode,
         },
       );
       return json(res, 201, { code: room.code, token: player.token });

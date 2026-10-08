@@ -60,11 +60,14 @@
                 hidden
               /><a href="/" class="text-button">Manage playlists</a>
             </div>
-            <label class="toggle-row" for="room-balance-playlists">
-              <input id="room-balance-playlists" type="checkbox" autocomplete="off" />
-              Equal playlist chances
-            </label>
-            <p class="muted small">50/50 with two playlists, regardless of size.</p>
+            <div class="field">
+              <label for="room-playlist-mode">Playlist mode</label>
+              <select id="room-playlist-mode">
+                <option value="equal">50/50</option>
+                <option value="alternating">Back and forth</option>
+              </select>
+            </div>
+            <p class="muted small">Equal chances, or take turns between playlists.</p>
             <label class="toggle-row" for="room-random-start"
               ><input
                 id="room-random-start"

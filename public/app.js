@@ -1,7 +1,7 @@
 import { ClipPlayer, CLIP_LENGTHS } from "./audio.js";
 import { celebrate, confettiMultiplier } from "./confetti.js";
 import { mergeSuggestions } from "./guess-search.js";
-import { songCandidates } from "./song-selection.js";
+import { songCandidates, nextPlaylist, SONG_ATTEMPTS } from "./song-selection.js";
 import { recordingKey } from "./recording.js";
 import { spotifyAppURL } from "./spotify-links.js";
 import {
@@ -45,7 +45,8 @@ const state = {
   done: false,
   won: false,
   randomStart: settings.randomStart === true,
-  balancePlaylists: settings.balancePlaylists === true,
+  playlistMode: settings.playlistMode === "alternating" ? "alternating" : "equal",
+  nextPlaylistId: settings.nextPlaylistId,
   selectedSources: Array.isArray(settings.sources)
     ? settings.sources
     : [settings.source || "curated"],
@@ -87,11 +88,12 @@ function prepareNextSong() {
     signal = controller.signal;
   const candidates = songCandidates(pool, {
     played: state.played,
-    balancePlaylists: state.balancePlaylists,
+    playlistMode: state.playlistMode,
+    nextPlaylistId: state.nextPlaylistId,
   });
   const task = (async () => {
     let lastError;
-    for (const seed of candidates.slice(0, 8)) {
+    for (const seed of candidates.slice(0, SONG_ATTEMPTS)) {
       signal.throwIfAborted();
       try {
         let track, buffer, artwork;
@@ -205,7 +207,8 @@ function saveSettings() {
     to: $("year-to").value,
     volume: $("volume").value,
     randomStart: state.randomStart,
-    balancePlaylists: state.balancePlaylists,
+    playlistMode: state.playlistMode,
+    nextPlaylistId: state.nextPlaylistId,
     autoPlay: $("auto-play").checked,
     confettiMultiplier: Number($("confetti-amount").value),
   });
@@ -388,7 +391,10 @@ async function newRound() {
     if (request !== state.request) return;
     activePreparation = null;
     player.setBuffer(buffer, state.randomStart);
-    state.track = { ...track, poolSources: seed.poolSources || [] };
+    state.track = { ...track, poolSources: seed.poolSources || [],
+      selectedSourceId: seed.selectedSourceId ?? seed.poolSources?.[0]?.id };
+    state.nextPlaylistId = nextPlaylist(state.pool, state.track.selectedSourceId);
+    saveSettings();
     if (artwork) {
       artwork.id = "reveal-cover";
       artwork.alt = "";
@@ -459,6 +465,7 @@ function updateSourceLabel() {
 async function refreshSources(selected = state.selectedSources) {
   const data = await restoredPlaylists(api);
   if (data.warning) cacheStatus(data.warning);
+  state.nextPlaylistId = data.sourceMap.get(state.nextPlaylistId) || state.nextPlaylistId;
   state.playlists = data.playlists;
   state.builtIns = data.builtIns || [];
   const options = sourceOptions();
@@ -891,8 +898,9 @@ $("random-start").addEventListener("change", () => {
   if (!state.loading && state.track)
     $("play-text").textContent = playbackLabel();
 });
-$("balance-playlists").addEventListener("change", () => {
-  state.balancePlaylists = $("balance-playlists").checked;
+$("playlist-mode").addEventListener("change", () => {
+  state.playlistMode = $("playlist-mode").value;
+  state.nextPlaylistId = state.track ? nextPlaylist(state.pool, state.track.selectedSourceId) : undefined;
   saveSettings();
   nextSong?.controller.abort();
   nextSong = null;
@@ -1042,7 +1050,7 @@ async function init() {
   player.setVolume(Number($("volume").value) / 100);
   $("random-start").checked = state.randomStart;
   $("auto-play").checked = settings.autoPlay ?? true;
-  $("balance-playlists").checked = state.balancePlaylists;
+  $("playlist-mode").value = state.playlistMode;
   $("confetti-amount").value = confettiMultiplier(
     settings.confettiMultiplier ?? 1,
   );

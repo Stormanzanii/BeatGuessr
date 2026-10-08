@@ -42,12 +42,15 @@
           Select multiple sources to combine their songs. Duplicate songs are
           counted once.
         </div>
-        <label class="toggle-row" for="balance-playlists">
-          <input id="balance-playlists" type="checkbox" autocomplete="off" />
-          Equal playlist chances
-        </label>
+        <div class="field">
+          <label for="playlist-mode">Playlist mode</label>
+          <select id="playlist-mode">
+            <option value="equal">50/50</option>
+            <option value="alternating">Back and forth</option>
+          </select>
+        </div>
         <p class="muted small">
-          50/50 with two playlists, regardless of size. Applies from the next song.
+          Equal chances, or take turns between playlists. Applies from the next song.
         </p>
         <details class="filter-settings">
           <summary>Genre & release years</summary>

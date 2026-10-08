@@ -2,7 +2,7 @@ import { randomBytes, randomUUID } from "node:crypto";
 import { normalize } from "./matching.js";
 import { randomClipStart } from "../public/clip-start.js";
 import { wasGuessedWrong } from "../public/guess-history.js";
-import { songCandidates } from "../public/song-selection.js";
+import { songCandidates, nextPlaylist, SONG_ATTEMPTS } from "../public/song-selection.js";
 
 const lengths = [0.1, 0.5, 2, 8, 15];
 const fail = (message, status = 400) => {
@@ -25,7 +25,7 @@ export class LobbyHub {
     name,
     pool,
     owner,
-    { randomStart = false, balancePlaylists = false } = {},
+    { randomStart = false, playlistMode = "equal" } = {},
   ) {
     this.prune();
     if (!pool.length) fail("Select at least one imported playlist with songs.");
@@ -43,7 +43,8 @@ export class LobbyHub {
       code,
       owner,
       randomStart: randomStart === true,
-      balancePlaylists: balancePlaylists === true,
+      playlistMode: playlistMode === "alternating" ? "alternating" : "equal",
+      nextPlaylistId: undefined,
       pool,
       players: new Map(),
       round: null,
@@ -168,7 +169,7 @@ export class LobbyHub {
       serverNow: this.now(),
       poolCount: room.pool.length,
       randomStart: room.randomStart,
-      balancePlaylists: room.balancePlaylists,
+      playlistMode: room.playlistMode,
       wrongGuesses: round?.wrong.get(player.id) || [],
       players: [...room.players.values()].map((p) => ({
         id: p.id,
@@ -326,26 +327,22 @@ export class LobbyHub {
     if (room.preload) return room.preload;
     const queued = { id: randomUUID(), asset: null, task: null };
     room.preload = queued;
-    if (
-      !room.balancePlaylists &&
-      room.pool.every((song) => room.used.has(song.id))
-    ) {
-      room.used.clear();
-    }
     const candidates = songCandidates(room.pool, {
       played: room.used,
       lastPlayed: room.round?.seedId,
-      balancePlaylists: room.balancePlaylists,
+      playlistMode: room.playlistMode,
+      nextPlaylistId: room.nextPlaylistId,
       random: this.random,
     });
     queued.task = (async () => {
-      for (const seed of candidates.slice(0, 8)) {
+      for (const seed of candidates.slice(0, SONG_ATTEMPTS)) {
         if (!this.rooms.has(room.code)) return null;
         try {
           const loaded = await this.loadTrack(seed);
           queued.asset = {
             ...loaded,
-            track: { ...loaded.track, poolSources: seed.poolSources },
+            track: { ...loaded.track, poolSources: seed.poolSources,
+              selectedSourceId: seed.selectedSourceId ?? seed.poolSources?.[0]?.id },
             seedId: seed.id,
           };
           if (room.preload === queued && this.rooms.has(room.code))
@@ -394,6 +391,7 @@ export class LobbyHub {
       Object.assign(round, loaded);
       round.phase = "guessing";
       room.used.add(loaded.seedId);
+      room.nextPlaylistId = nextPlaylist(room.pool, loaded.track.selectedSourceId);
       room.message =
         "Audio is loading. Each player can replay the current clip.";
       this.broadcast(room);

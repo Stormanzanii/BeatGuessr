@@ -79,7 +79,7 @@ Correct answers animate the record and release confetti. The saved slider under 
 
 Open Sources and check one or more collections. Press Apply & new song to shuffle their combined pool. Overlapping songs are deduplicated. Genre and year controls are under Genre & release years. By default, each song in the combined pool has an equal chance, and the app avoids recently served songs until that pool is exhausted.
 
-Enable **Equal playlist chances** under Sources to choose a playlist before choosing a song. Two playlists each get a 50% chance per round, regardless of their sizes; with more playlists, each gets an equal chance. The toggle is off by default, saves across refreshes, and applies from the next song. Lobby hosts can enable the same option before creating a room; it applies to everyone.
+Use the **Playlist mode** dropdown under Sources. **50/50** chooses a playlist at random with equal chances, regardless of playlist size. **Back and forth** takes turns between your selected playlists each round; with more than two, it cycles through the available sources. Songs within a playlist are still chosen at random. The mode applies from the next song and saves across refreshes, including the next playlist's turn. Lobby hosts choose the same modes before creating a room; their choice applies to everyone.
 
 Smaller playlists can repeat after their available songs run out, while unseen songs are preferred within each playlist. Shared songs remain a single track and can be selected through either playlist. Only sources with songs matching your filters participate, and unavailable previews can fall back to another source.
 
