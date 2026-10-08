@@ -3,39 +3,68 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#f2ede4" media="(prefers-color-scheme: light)" />
-    <meta name="theme-color" content="#12110f" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#16121a" />
     <title>Play with friends · BeatGuessr</title>
     <link rel="icon" href="/icon.svg" type="image/svg+xml" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      rel="stylesheet"
-      href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wdth,wght@75..100,400..700&family=Instrument+Serif:ital@0;1&display=swap"
-    />
-    <link rel="stylesheet" href="/style.css" />
-    <link rel="stylesheet" href="/layout.css" />
-    <link rel="stylesheet" href="/lobby.css" />
+    <link rel="stylesheet" href="/base.css" />
+    <link rel="stylesheet" id="theme-css" href="/themes/spicy.css" />
+    <script>
+      // Apply the saved theme before first paint. Keep in step with theme.js.
+      try {
+        const theme = localStorage.getItem("beatguessr:theme");
+        if (["spicy", "sleeve", "broadcast", "neon"].includes(theme)) {
+          document.getElementById("theme-css").href = `/themes/${theme}.css`;
+          document.documentElement.dataset.theme = theme;
+        } else document.documentElement.dataset.theme = "spicy";
+      } catch {
+        document.documentElement.dataset.theme = "spicy";
+      }
+    </script>
     <script type="module" src="/lobby.js"></script>
   </head>
   <body>
+    <div class="ambient" aria-hidden="true">
+      <div class="ambient-layer"></div>
+      <div class="ambient-layer"></div>
+      <div class="ambient-layer"></div>
+    </div>
     <header class="topbar">
       <div class="topbar-inner">
-        <a class="brand" href="/" aria-label="BeatGuessr home"
-          ><span class="brand-disc" aria-hidden="true"></span
-          ><span class="brand-name">BeatGuessr</span></a
-        >
+        <div class="topbar-left">
+          <a class="brand" href="/" aria-label="BeatGuessr home"
+            ><span class="brand-disc" aria-hidden="true"></span
+            ><span class="brand-bars" aria-hidden="true"><i></i><i></i><i></i></span
+            ><span class="brand-name">BeatGuessr</span></a
+          >
+          <span class="tally" aria-hidden="true"
+            ><i></i><span class="tally-idle">Standby</span
+            ><span class="tally-live">On air</span></span
+          >
+        </div>
         <nav class="mode-switch" aria-label="Game mode">
           <a href="/">Solo</a
           ><a href="/lobby" aria-current="page">With friends</a>
         </nav>
-        <span id="connection" class="connection" role="status"></span>
+        <div class="topbar-right">
+          <span id="connection" class="connection" role="status"></span>
+          <label class="theme-picker"
+            ><span class="theme-label">Theme</span
+            ><select id="theme-select" aria-label="Theme">
+              <option value="spicy">Spicy</option>
+              <option value="sleeve">Sleeve</option>
+              <option value="broadcast">Broadcast</option>
+              <option value="neon">Neon</option>
+            </select></label
+          >
+        </div>
       </div>
     </header>
     <main class="lobby-shell">
       <section id="setup" class="panel lobby-setup">
         <div class="eyebrow">Multiplayer</div>
-        <h1 class="display">Bring the whole room.</h1>
+        <h1>Bring the whole room.</h1>
         <p class="muted">
           Replay clips at your own pace. Everyone guesses. Vote together for a
           longer clip.
@@ -101,7 +130,7 @@
           <div class="room-heading">
             <div>
               <div class="eyebrow">Room <span id="code-label" class="room-code"></span></div>
-              <h1 id="round-title" class="display">Ready when you are.</h1>
+              <h1 id="round-title">Ready when you are.</h1>
             </div>
             <button id="copy-invite" class="button secondary">
               Copy invite

@@ -3,41 +3,77 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#f2ede4" media="(prefers-color-scheme: light)" />
-    <meta name="theme-color" content="#12110f" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#16121a" />
     <title>BeatGuessr</title>
     <link rel="icon" href="/icon.svg" type="image/svg+xml" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      rel="stylesheet"
-      href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wdth,wght@75..100,400..700&family=Instrument+Serif:ital@0;1&display=swap"
-    />
-    <link rel="stylesheet" href="/style.css" />
-    <link rel="stylesheet" href="/layout.css" />
+    <link rel="stylesheet" href="/base.css" />
+    <link rel="stylesheet" id="theme-css" href="/themes/spicy.css" />
+    <script>
+      // Apply the saved theme before first paint. Keep in step with theme.js.
+      try {
+        const theme = localStorage.getItem("beatguessr:theme");
+        if (["spicy", "sleeve", "broadcast", "neon"].includes(theme)) {
+          document.getElementById("theme-css").href = `/themes/${theme}.css`;
+          document.documentElement.dataset.theme = theme;
+        } else document.documentElement.dataset.theme = "spicy";
+      } catch {
+        document.documentElement.dataset.theme = "spicy";
+      }
+    </script>
     <script type="module" src="/app.js"></script>
   </head>
   <body>
+    <div class="ambient" aria-hidden="true">
+      <div class="ambient-layer"></div>
+      <div class="ambient-layer"></div>
+      <div class="ambient-layer"></div>
+    </div>
     <header class="topbar">
       <div class="topbar-inner">
-        <a class="brand" href="/" aria-label="BeatGuessr home"
-          ><span class="brand-disc" aria-hidden="true"></span
-          ><span class="brand-name">BeatGuessr</span></a
-        >
+        <div class="topbar-left">
+          <a class="brand" href="/" aria-label="BeatGuessr home"
+            ><span class="brand-disc" aria-hidden="true"></span
+            ><span class="brand-bars" aria-hidden="true"><i></i><i></i><i></i></span
+            ><span class="brand-name">BeatGuessr</span></a
+          >
+          <span class="tally" aria-hidden="true"
+            ><i></i><span class="tally-idle">Standby</span
+            ><span class="tally-live">On air</span></span
+          >
+        </div>
         <nav class="mode-switch" aria-label="Game mode">
           <a href="/" aria-current="page">Solo</a
           ><a href="/lobby">With friends</a>
         </nav>
-        <button id="help-button" class="button ghost" type="button">
-          How to play
-        </button>
+        <div class="topbar-right">
+          <label class="theme-picker"
+            ><span class="theme-label">Theme</span
+            ><select id="theme-select" aria-label="Theme">
+              <option value="spicy">Spicy</option>
+              <option value="sleeve">Sleeve</option>
+              <option value="broadcast">Broadcast</option>
+              <option value="neon">Neon</option>
+            </select></label
+          >
+          <button id="help-button" class="button ghost help-button" type="button"
+            ><span class="help-glyph" aria-hidden="true">?</span
+            ><span class="help-text">How to play</span></button
+          >
+        </div>
       </div>
     </header>
     <main class="workspace">
       <aside class="library panel" aria-labelledby="library-heading">
         <div class="panel-head">
-          <h2 id="library-heading">Library</h2>
-          <span id="pool-count" class="panel-sub">Loading collection…</span>
+          <div class="panel-title">
+            <span class="eyebrow">Library</span>
+            <h2 id="library-heading">Your music</h2>
+          </div>
+          <span class="panel-icon" aria-hidden="true"
+            ><svg viewBox="0 0 24 24"><path d="M9 18V5l12-2v13" /><circle cx="6" cy="18" r="3" /><circle cx="18" cy="16" r="3" /></svg
+          ></span>
         </div>
         <span class="label" id="source-label">Sources</span>
         <div class="source-picker">
@@ -105,12 +141,13 @@
           </div>
         </details>
         <div class="filter-actions">
-          <button id="apply-filters" class="button primary">
+          <span id="pool-count" class="pool-count">Loading collection…</span
+          ><button id="apply-filters" class="button primary">
             Apply & new song
           </button>
         </div>
         <div class="panel-section">
-          <span class="label">Add music</span>
+          <span class="label section-label">Add music</span>
           <div class="import-actions">
             <button id="import-button" class="button secondary">
               <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 5h12M4 10h12M4 15h7" /></svg>
@@ -168,48 +205,49 @@
             <div class="record-slot">
               <div class="record" id="record">
                 <svg viewBox="0 0 300 300" aria-hidden="true">
-                  <circle cx="150" cy="150" r="148.5" fill="#141210" stroke="#4a443d" />
-                  <circle cx="150" cy="150" r="138" fill="none" stroke="#2a2622" />
-                  <circle cx="150" cy="150" r="126" fill="none" stroke="#211e1b" />
-                  <circle cx="150" cy="150" r="114" fill="none" stroke="#2a2622" />
-                  <circle cx="150" cy="150" r="102" fill="none" stroke="#211e1b" />
-                  <circle cx="150" cy="150" r="90" fill="none" stroke="#2a2622" />
-                  <circle cx="150" cy="150" r="78" fill="none" stroke="#211e1b" />
-                  <circle cx="150" cy="150" r="58" fill="#f4ede0" />
-                  <circle cx="150" cy="150" r="52" fill="none" stroke="#e0482a" stroke-width="2" />
+                  <circle class="vinyl" cx="150" cy="150" r="148.5" fill="#141210" stroke="#4a443d" />
+                  <circle class="groove" cx="150" cy="150" r="138" fill="none" stroke="#2a2622" />
+                  <circle class="groove groove-alt" cx="150" cy="150" r="126" fill="none" stroke="#211e1b" />
+                  <circle class="groove" cx="150" cy="150" r="114" fill="none" stroke="#2a2622" />
+                  <circle class="groove groove-alt" cx="150" cy="150" r="102" fill="none" stroke="#211e1b" />
+                  <circle class="groove" cx="150" cy="150" r="90" fill="none" stroke="#2a2622" />
+                  <circle class="groove groove-alt" cx="150" cy="150" r="78" fill="none" stroke="#211e1b" />
+                  <circle class="label-disc" cx="150" cy="150" r="58" fill="#f4ede0" />
+                  <circle class="label-ring" cx="150" cy="150" r="52" fill="none" stroke="#e0482a" stroke-width="2" />
                   <text
                     id="record-label-title"
+                    class="label-title"
                     x="150"
                     y="133"
                     text-anchor="middle"
                     fill="#1c1a17"
-                    font-size="15"
-                    font-family="Instrument Serif, serif"
-                    font-style="italic"
+                    font-size="13"
+                    font-weight="700"
+                    letter-spacing="1"
                   >
-                    BeatGuessr
+                    BEATGUESSR
                   </text>
                   <text
                     id="record-label-subtitle"
+                    class="label-text"
                     x="150"
                     y="144"
                     text-anchor="middle"
                     fill="#7b7468"
                     font-size="5.5"
-                    font-family="Instrument Sans, sans-serif"
                     letter-spacing="1"
                   >
                     SIDE A · UNKNOWN TRACK
                   </text>
-                  <circle cx="150" cy="158" r="5" fill="#141210" />
+                  <circle class="label-hole" cx="150" cy="158" r="5" fill="#141210" />
                   <text
                     id="record-label-footer"
+                    class="label-text"
                     x="150"
                     y="180"
                     text-anchor="middle"
                     fill="#7b7468"
                     font-size="5.5"
-                    font-family="Instrument Sans, sans-serif"
                     letter-spacing="1"
                   >
                     LISTEN CLOSELY
@@ -220,6 +258,7 @@
                   <span class="record-spindle" aria-hidden="true"></span>
                 </div>
               </div>
+              <span class="record-sheen" aria-hidden="true"></span>
             </div>
           </div>
         </div>
@@ -307,8 +346,13 @@
       </section>
       <aside class="session panel" aria-labelledby="session-heading">
         <div class="panel-head">
-          <h2 id="session-heading">Scoreboard</h2>
-          <span class="panel-sub">This session</span>
+          <div class="panel-title">
+            <span class="eyebrow">This session</span>
+            <h2 id="session-heading">Scoreboard</h2>
+          </div>
+          <span class="panel-icon" aria-hidden="true"
+            ><svg viewBox="0 0 24 24"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0V4zM17 6h3v2a3 3 0 0 1-3 3M7 6H4v2a3 3 0 0 0 3 3" /></svg
+          ></span>
         </div>
         <div class="stats">
           <div><strong id="stat-solved">0</strong><span>Identified</span></div>
@@ -318,8 +362,9 @@
           <span>Fastest guess</span><strong id="stat-best">—</strong>
         </div>
         <div class="panel-section">
+          <span class="label section-label">Playback</span>
           <div class="volume-label">
-            <span class="label">Volume</span><span id="volume-value">60%</span>
+            <span>Volume</span><span id="volume-value">60%</span>
           </div>
           <input
             id="volume"
@@ -346,7 +391,7 @@
           <p id="random-start-hint" class="hint" aria-live="polite"></p>
           <div class="confetti-setting">
             <div class="volume-label">
-              <label class="label" for="confetti-amount">Confetti</label
+              <label for="confetti-amount">Confetti</label
               ><output id="confetti-value" for="confetti-amount">1×</output>
             </div>
             <input
@@ -364,7 +409,7 @@
           </div>
         </details>
         <div class="panel-section recent">
-          <span class="label">Recently played</span>
+          <span class="label section-label">Recently played</span>
           <div id="recent-tracks" class="recent-tracks">
             <p class="hint">Finished songs show up here.</p>
           </div>
@@ -372,9 +417,10 @@
       </aside>
     </main>
     <footer>
-      Previews are excerpts from the middle of songs. Add local files to hear
-      intros.
+      <span>Previews are excerpts from the middle of songs.</span
+      ><span>Add local files to hear intros.</span>
     </footer>
+
     <dialog id="import-dialog">
       <div class="dialog-heading">
         <h2>Import a playlist</h2>

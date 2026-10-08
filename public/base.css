@@ -1,0 +1,119 @@
+/* Structure every theme relies on. Themes in /themes/ supply all of the
+   look; this file only holds behaviour that must not change between them. */
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow-x: hidden;
+}
+button,
+input,
+select {
+  font: inherit;
+  color: inherit;
+}
+button {
+  cursor: pointer;
+}
+h1,
+h2,
+p {
+  margin: 0;
+}
+[hidden] {
+  display: none !important;
+}
+
+/* Decorations are off unless a theme turns them on. */
+.ambient,
+.brand-bars,
+.tally,
+.sleeve,
+.record-sheen,
+.eq,
+.panel-icon,
+.help-glyph {
+  display: none;
+}
+
+/* Answer view: the guessing controls step aside. */
+.game.is-revealed .instructions,
+.game.is-revealed .clip-control,
+.game.is-revealed #guess-form,
+.game.is-revealed .guess-history,
+.game.is-revealed #give-up {
+  display: none;
+}
+
+/* Lists that open from a field. suggestion-position.js flips them above the
+   field when there is no room below. */
+.source-picker,
+.guess-field,
+#room-guess-form {
+  position: relative;
+}
+.suggestions,
+.source-dropdown {
+  position: absolute;
+  z-index: 25;
+  left: 0;
+  right: 0;
+  top: calc(100% + 6px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.suggestions.above,
+#room-suggestions.above {
+  top: auto;
+  bottom: calc(100% + 6px);
+}
+.suggestions button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  text-align: left;
+}
+.suggestions .suggestion-title {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  min-width: 0;
+}
+
+.theme-picker {
+  display: inline-flex;
+  align-items: center;
+}
+.theme-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.confetti {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  pointer-events: none;
+  z-index: 9999;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

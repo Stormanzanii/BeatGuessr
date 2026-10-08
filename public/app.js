@@ -6,6 +6,11 @@ import { recordingKey } from "./recording.js";
 import { spotifyAppURL } from "./spotify-links.js";
 import { trackSuggestions } from "./suggestion-position.js";
 import {
+  setupThemePicker,
+  setAmbientCover,
+  setProgress,
+} from "./theme.js";
+import {
   restoredPlaylists, rememberPlaylist, forgetPlaylist,
   savedAudio, rememberAudio, clearAudio, cacheErrorMessage,
 } from "./library-cache.js";
@@ -16,6 +21,7 @@ import {
 } from "./guess-history.js";
 
 const $ = (id) => document.getElementById(id);
+setupThemePicker($("theme-select"));
 const placeSuggestionList = trackSuggestions(
   $("suggestions"),
   $("guess").closest(".guess-wrapper"),
@@ -68,6 +74,7 @@ const state = {
 const player = new ClipPlayer(
   (progress) => {
     $("audio-progress").style.width = `${progress * 100}%`;
+    setProgress(progress);
   },
   (playing) => {
     $("record")?.classList.toggle("spinning", playing);
@@ -332,6 +339,7 @@ function showReveal(won) {
   if (song.cover) {
     if ($("reveal-cover").getAttribute("src") !== song.cover)
       $("reveal-cover").src = song.cover;
+    setAmbientCover(song.cover);
   } else $("reveal-cover").removeAttribute("src");
   $("reveal-links").replaceChildren();
   for (const [href, label, browser] of [

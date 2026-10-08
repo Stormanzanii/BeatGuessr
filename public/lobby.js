@@ -4,8 +4,14 @@ import { wasGuessedWrong, nextEnabledSuggestion } from "./guess-history.js";
 import { restoredPlaylists, rememberPlaylist, cacheErrorMessage } from "./library-cache.js";
 import { spotifyAppURL } from "./spotify-links.js";
 import { trackSuggestions } from "./suggestion-position.js";
+import {
+  setupThemePicker,
+  setAmbientCover,
+  setProgress,
+} from "./theme.js";
 
 const $ = (id) => document.getElementById(id);
+setupThemePicker($("theme-select"));
 const placeSuggestionList = trackSuggestions(
   $("room-suggestions"),
   $("room-guess"),
@@ -39,7 +45,10 @@ let suggestions = [],
 const celebrated = new Set();
 const mediaCache = new Map();
 const player = new ClipPlayer(
-  (progress) => ($("room-progress").style.width = `${progress * 100}%`),
+  (progress) => {
+    $("room-progress").style.width = `${progress * 100}%`;
+    setProgress(progress);
+  },
   (playing) => {
     $("lobby-record").classList.toggle("spinning", playing);
     document.body.classList.toggle("is-playing", playing);
@@ -549,6 +558,7 @@ function render() {
         $("lobby-cover").src = cover;
       $("lobby-cover").alt = `${track.title} artwork`;
       $("lobby-cover").hidden = false;
+      setAmbientCover(cover);
     }
     $("answer-links").replaceChildren();
     for (const [url, label, browser] of [
