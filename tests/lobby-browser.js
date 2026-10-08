@@ -41,6 +41,7 @@ lobbies.loadTrack = async (seed) => ({
     ...seed,
     album: "Friends' collection",
     year: 2020,
+    spotifyUrl: "https://open.spotify.com/track/1234567890123456789012",
     cover:
       "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Crect width='200' height='200' fill='%23bee56c'/%3E%3C/svg%3E",
   },
@@ -130,9 +131,12 @@ try {
   await host.locator('#lobby-sources input[value="curated"]').uncheck();
   await host.locator("#nickname").fill("Host");
   await host.locator("#room-random-start").check();
+  await host.locator("#room-balance-playlists").check();
   await host.locator(`#lobby-sources input[value="${playlist.id}"]`).check();
   await host.locator("#create-room").click();
   await host.locator("#room").waitFor();
+  await host.waitForFunction(() => beatguessrLobby.state.balancePlaylists === true);
+  assert.equal(await host.evaluate(() => JSON.parse(localStorage.getItem("beatguessr:settings")).balancePlaylists), true);
   const code = await host.locator("#code-label").textContent();
   for (const [i, guest] of guests.entries()) {
     await guest.goto(`${base}/lobby/${code}`);
@@ -449,6 +453,8 @@ try {
     "Advancing to a preloaded song does not refetch audio or artwork",
   );
   await host.locator("#host-reveal").click();
+  await host.locator('#answer-links a[href="spotify:track:1234567890123456789012"]').waitFor();
+  assert.equal(await host.locator('#answer-links a[href="spotify:track:1234567890123456789012"]').getAttribute("target"), null);
   await Promise.all(
     pages.map((page) =>
       page.waitForFunction(
@@ -540,6 +546,7 @@ try {
       document.getElementById("reveal-cover").naturalWidth > 0,
   );
   const firstId = await host.evaluate(() => beatguessr.state.track.id);
+  assert.equal(await host.locator("#balance-playlists").isChecked(), false);
   const nextId = soloPool.find((song) => song.id !== firstId).id;
   assert.equal(
     audioReads.get(nextId),
@@ -689,6 +696,55 @@ try {
     true,
     "A new round clears incorrect suggestions",
   );
+  const balanceIds = [];
+  for (const [name, count] of [["Small balanced mix", 1], ["Large balanced mix", 9]]) {
+    const response = await contexts[0].request.post(`${base}/api/playlists/import`, {
+      data: {
+        name,
+        csv: "Title,Artist\n" + Array.from({ length: count }, (_, index) =>
+          `${name} ${index},Test Artist`).join("\n"),
+      },
+    });
+    balanceIds.push((await response.json()).playlist.id);
+  }
+  const balancedPool = (await (await contexts[0].request.get(
+    `${base}/api/catalog?sources=${balanceIds.join(",")}`,
+  )).json()).tracks;
+  await host.unroute("**/api/resolve");
+  await host.route("**/api/resolve", async (route) => {
+    const seed = balancedPool.find((song) => song.id === route.request().postDataJSON().id);
+    await route.fulfill({ json: { track: {
+      ...seed, source: "Fixture", cover: `${base}/fixture-cover/${seed.id}.png`,
+    } } });
+  });
+  await host.addInitScript(() => { Math.random = () => 0; });
+  await host.evaluate((sources) => {
+    const settings = JSON.parse(localStorage.getItem("beatguessr:settings"));
+    localStorage.setItem("beatguessr:settings", JSON.stringify({
+      ...settings, sources, balancePlaylists: false,
+    }));
+  }, balanceIds);
+  await host.reload();
+  await host.waitForFunction(() => !beatguessr.state.loading && beatguessr.preloaded);
+  assert.equal(await host.evaluate(() => beatguessr.state.track.poolSources[0].id), balanceIds[1]);
+  await host.locator("#balance-playlists").check();
+  await host.waitForFunction(() => beatguessr.preloaded);
+  await host.locator("#reroll").click();
+  await host.waitForFunction(() => !beatguessr.state.loading);
+  assert.equal(await host.evaluate(() => beatguessr.state.track.poolSources[0].id), balanceIds[0],
+    "Enabling balance replaces the queued song and selects the small playlist first for this random roll");
+  assert.equal(await host.evaluate(() => JSON.parse(localStorage.getItem("beatguessr:settings")).balancePlaylists), true);
+  await host.screenshot({ path: "test-results/balanced-playlists.png", fullPage: true });
+  await host.reload();
+  await host.waitForFunction(() => !beatguessr.state.loading);
+  assert.equal(await host.locator("#balance-playlists").isChecked(), true,
+    "Equal playlist chances persist across refreshes");
+  await host.locator("#balance-playlists").uncheck();
+  assert.equal(await host.evaluate(() => beatguessr.state.balancePlaylists), false);
+  await host.locator("#reroll").click();
+  await host.waitForFunction(() => !beatguessr.state.loading);
+  assert.equal(await host.evaluate(() => beatguessr.state.track.poolSources[0].id), balanceIds[1],
+    "Disabling balance restores selection from the combined song pool");
   assert.equal(errors.length, 0, errors.join("\n"));
   console.log(
     "Four-browser lobby passed: personal and shared playback, unanimous votes with 30s countdown, scores, 30s reveals, reconnects, wrong guesses, and audio/artwork preloading.",

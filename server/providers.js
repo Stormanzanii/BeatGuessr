@@ -69,6 +69,8 @@ const deezerSong = (t) => ({
   id: `deezer:${t.id}`,
   providerId: t.id,
   title: t.title,
+  version: t.title_version || "",
+  isrc: t.isrc?.replace(/-/g, "").toUpperCase() || null,
   artist: t.artist?.name,
   album: t.album?.title,
   cover: t.album?.cover_big,
@@ -151,6 +153,8 @@ export async function resolveSong(seed, failedSource) {
     seed.artist,
     seed.year,
     seed.genre,
+    seed.album,
+    seed.isrc,
     failedSource,
   ]);
   const cached = metadataCache.get(key);
@@ -165,11 +169,11 @@ export async function resolveSong(seed, failedSource) {
       if (source === failedSource) continue;
       try {
         const songs =
-          source === "Deezer" && seed.deezerId
+          source === "Deezer" && (seed.deezerId || seed.isrc)
             ? [
                 deezerSong(
                   await getJSON(
-                    `https://api.deezer.com/track/${seed.deezerId}`,
+                    `https://api.deezer.com/track/${seed.isrc ? `isrc:${encodeURIComponent(seed.isrc)}` : seed.deezerId}`,
                   ),
                 ),
               ].filter((t) => t.previewUrl)

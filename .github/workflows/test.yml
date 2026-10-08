@@ -16,4 +16,7 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npx playwright install --with-deps chromium
+      - run: npm run test:artwork
+      - run: npm run test:storage
+      - run: npm run test:playback
       - run: npm run test:lobby

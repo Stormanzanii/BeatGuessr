@@ -99,12 +99,15 @@ export function parseCSV(csv, name = "Imported playlist") {
         /(?:spotify:track:|open\.spotify\.com\/track\/)([a-zA-Z0-9]{22})/.exec(
           uri,
         )?.[1];
+      const isrc = field(row, ["isrc"]).replace(/-/g, "").toUpperCase();
       return {
         id: spotifyId ? `spotify:track:${spotifyId}` : randomUUID(),
         title: title.slice(0, 300),
         artist: artist.replace(/;/g, ", ").slice(0, 300),
         year: year >= 1900 && year <= 2100 ? year : null,
         genre: field(row, ["genre", "genres"]).slice(0, 100) || "Unknown",
+        album: field(row, ["album", "albumname"]).slice(0, 300) || null,
+        isrc: /^[A-Z]{2}[A-Z0-9]{3}\d{7}$/.test(isrc) ? isrc : null,
         origin: "csv",
         spotifyUrl: spotifyId
           ? `https://open.spotify.com/track/${spotifyId}`
@@ -112,17 +115,22 @@ export function parseCSV(csv, name = "Imported playlist") {
       };
     })
     .filter((t) => t.title && t.artist);
-  const deduped = new Map();
+  const deduped = new Map(), unique = [];
   for (const track of tracks) {
-    const key = `${track.title.toLowerCase()}|${track.artist.toLowerCase()}`;
-    const existing = deduped.get(key);
+    const key = `${track.title.toLowerCase()}|${track.artist.toLowerCase()}|${track.isrc || ""}|${track.album || ""}`;
+    const candidates = deduped.get(key) || [];
+    const existing = candidates.find((song) => !song.spotifyUrl || !track.spotifyUrl ||
+      song.spotifyUrl === track.spotifyUrl);
     if (existing) {
       existing.spotifyUrl ||= track.spotifyUrl;
       existing.year ??= track.year;
       if (existing.genre === "Unknown") existing.genre = track.genre;
-    } else deduped.set(key, track);
+    } else {
+      unique.push(track);
+      candidates.push(track);
+      deduped.set(key, candidates);
+    }
   }
-  const unique = [...deduped.values()];
   const playlistIds = rows.map((row) =>
     spotifyPlaylistId(field(row, ["playlisturl", "playlisturi"])),
   );

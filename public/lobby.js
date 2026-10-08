@@ -1,6 +1,8 @@
 import { ClipPlayer } from "./audio.js";
 import { celebrate, confettiMultiplier } from "./confetti.js";
 import { wasGuessedWrong, nextEnabledSuggestion } from "./guess-history.js";
+import { restoredPlaylists, rememberPlaylist, cacheErrorMessage } from "./library-cache.js";
+import { spotifyAppURL } from "./spotify-links.js";
 
 const $ = (id) => document.getElementById(id);
 const stored = (key, fallback) => {
@@ -54,6 +56,7 @@ window.beatguessrLobby = {
 $("room-code").value = code;
 $("nickname").value = stored("beatguessr:nickname", "");
 $("room-random-start").checked = settings.randomStart === true;
+$("room-balance-playlists").checked = settings.balancePlaylists === true;
 $("room-volume").value = settings.volume ?? 60;
 player.setVolume(Number($("room-volume").value) / 100);
 function error(message = "") {
@@ -69,9 +72,11 @@ async function request(path, options = {}) {
   return data;
 }
 async function sources(selected) {
-  const data = await request("/api/playlists");
+  const data = await restoredPlaylists(request);
+  if (data.warning) error(data.warning);
   const options = [...(data.builtIns || []), ...data.playlists];
-  let chosen = selected || settings.sources || [];
+  let chosen = [...new Set((selected || settings.sources || [])
+    .map((id) => data.sourceMap.get(id) || id))];
   if (!chosen.some((id) => options.some((option) => option.id === id)))
     chosen = ["curated"];
   $("lobby-sources").replaceChildren();
@@ -204,6 +209,7 @@ async function enter(create) {
           name,
           sources: selected,
           randomStart: $("room-random-start").checked,
+          balancePlaylists: $("room-balance-playlists").checked,
         }),
       });
       code = created.code;
@@ -212,7 +218,9 @@ async function enter(create) {
         "beatguessr:settings",
         JSON.stringify({
           ...stored("beatguessr:settings", {}),
+          sources: selected,
           randomStart: $("room-random-start").checked,
+          balancePlaylists: $("room-balance-playlists").checked,
         }),
       );
     } else {
@@ -467,6 +475,8 @@ function render() {
   if (state.randomStart && round?.phase === "guessing" && round.offset != null)
     $("clip-status").textContent +=
       ` · Starts ${round.offset.toFixed(1)}s into the preview`;
+  if (state.balancePlaylists)
+    $("clip-status").textContent += " · Equal playlist chances";
   $("players").replaceChildren();
   for (const p of [...state.players].sort((a, b) => b.score - a.score)) {
     const row = document.createElement("div"),
@@ -532,16 +542,18 @@ function render() {
       $("lobby-cover").hidden = false;
     }
     $("answer-links").replaceChildren();
-    for (const [url, label] of [
-      [track.listenUrl, "Listen to song ↗"],
-      [track.spotifyUrl, "Open Spotify ↗"],
+    for (const [url, label, browser] of [
+      [track.listenUrl, "Listen to song ↗", true],
+      [spotifyAppURL(track.spotifyUrl), "Open in Spotify", false],
     ])
       if (url) {
         const a = document.createElement("a");
         a.href = url;
         a.textContent = label;
-        a.target = "_blank";
-        a.rel = "noopener noreferrer";
+        if (browser) {
+          a.target = "_blank";
+          a.rel = "noopener noreferrer";
+        }
         $("answer-links").append(a);
       }
   }
@@ -703,8 +715,11 @@ $("lobby-csv").addEventListener("change", async () => {
         csv: await file.text(),
       }),
     });
+    let warning = "";
+    try { await rememberPlaylist(result.playlist, request); }
+    catch (e) { warning = cacheErrorMessage(e); }
     await sources([result.playlist.id]);
-    error();
+    error(warning);
   } catch (e) {
     error(e.message);
   } finally {

@@ -8,6 +8,9 @@
     "start": "node server/index.js",
     "dev": "node --watch server/index.js",
     "test": "node --test tests/*.test.js",
+    "test:artwork": "node tests/artwork-browser.js",
+    "test:storage": "node tests/storage-browser.js",
+    "test:playback": "node tests/playback-browser.js",
     "test:browser": "node tests/browser.js",
     "test:lobby": "node tests/lobby-browser.js"
   },

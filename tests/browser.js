@@ -110,7 +110,15 @@ try {
   await page.waitForFunction(() => beatguessr.player.playing);
   const reward = await page.evaluate(() => beatguessr.player.lastSchedule);
   assert.equal(reward.seconds, Math.min(30, initial.duration));
-  assert.equal(reward.offset, 0);
+  assert.ok(
+    reward.offset >= 0 &&
+      reward.offset <= await page.evaluate(() => beatguessr.player.offset),
+    "The reveal starts at or before the guessing clip's audible point",
+  );
+  assert.ok(
+    reward.offset + reward.seconds <= initial.duration + 1e-8,
+    "The full reveal snippet fits within the available audio",
+  );
   assert.equal(await page.locator("#play-text").textContent(), "Stop snippet");
   await page.locator("#play-button").click();
   assert.equal(await page.evaluate(() => beatguessr.player.playing), false);

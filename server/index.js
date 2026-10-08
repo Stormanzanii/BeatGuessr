@@ -79,6 +79,14 @@ function json(res, status, data) {
   });
   res.end(JSON.stringify(data));
 }
+function playlistSummary({ tracks, ownerId, ...playlist }) {
+  return {
+    ...playlist,
+    count: tracks.length,
+    possiblyTruncated: playlist.possiblyTruncated ??
+      (tracks.length >= 100 && tracks[0]?.origin === "spotify"),
+  };
+}
 async function body(req) {
   const chunks = [];
   let size = 0;
@@ -157,7 +165,10 @@ export const server = createServer(async (req, res) => {
         input.name,
         selectedPool(owner, input.sources),
         owner,
-        { randomStart: input.randomStart },
+        {
+          randomStart: input.randomStart,
+          balancePlaylists: input.balancePlaylists,
+        },
       );
       return json(res, 201, { code: room.code, token: player.token });
     }
@@ -269,17 +280,17 @@ export const server = createServer(async (req, res) => {
     if (req.method === "GET" && url.pathname === "/api/playlists") {
       return json(res, 200, {
         builtIns: [{ id: "curated", name: "Popular", count: popular.length }],
-        playlists: ownPlaylists.map(({ tracks, ownerId, ...p }) => ({
-          ...p,
-          count: tracks.length,
-          possiblyTruncated:
-            p.possiblyTruncated ??
-            (tracks.length >= 100 && tracks[0]?.origin === "spotify"),
-        })),
+        playlists: ownPlaylists.map(playlistSummary),
       });
     }
     if (req.method === "POST" && url.pathname === "/api/playlists/import") {
       const input = await body(req);
+      const cacheKey = typeof input.cacheKey === "string" &&
+        /^[a-f0-9-]{36}$/i.test(input.cacheKey) ? input.cacheKey : undefined;
+      if (input.browserRestore === true && cacheKey) {
+        const existing = visiblePlaylists(owner).find((playlist) => playlist.cacheKey === cacheKey);
+        if (existing) return json(res, 201, { playlist: playlistSummary(existing) });
+      }
       let playlist;
       if (typeof input.csv === "string")
         playlist = parseCSV(input.csv, input.name || "Imported playlist");
@@ -301,15 +312,18 @@ export const server = createServer(async (req, res) => {
           );
         playlist = parseSpotifyEmbed(await response.text(), id);
       }
-      const old =
-        playlist.spotifyUrl &&
-        playlists.findIndex(
-          (p) =>
-            (p.ownerId || "local") === owner &&
-            p.spotifyUrl === playlist.spotifyUrl,
-        );
+      playlist.cacheKey = cacheKey;
+      if (input.browserRestore === true) {
+        playlist.possiblyTruncated = input.possiblyTruncated === true;
+        if (playlist.possiblyTruncated)
+          playlist.note += " This saved playlist may be incomplete; import a complete CSV for all songs.";
+      }
+      const old = playlists.findIndex((p) =>
+        (p.ownerId || "local") === owner &&
+        ((playlist.spotifyUrl && p.spotifyUrl === playlist.spotifyUrl) ||
+          (cacheKey && p.cacheKey === cacheKey)));
       playlist.ownerId = owner;
-      if (typeof old === "number" && old >= 0) {
+      if (old >= 0) {
         playlist.id = playlists[old].id;
         playlists[old] = playlist;
       } else {
@@ -321,12 +335,7 @@ export const server = createServer(async (req, res) => {
       }
       await save();
       return json(res, 201, {
-        playlist: {
-          ...playlist,
-          ownerId: undefined,
-          tracks: undefined,
-          count: playlist.tracks.length,
-        },
+        playlist: playlistSummary(playlist),
       });
     }
     if (req.method === "DELETE" && url.pathname.startsWith("/api/playlists/")) {

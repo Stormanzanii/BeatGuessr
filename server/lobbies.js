@@ -2,6 +2,7 @@ import { randomBytes, randomUUID } from "node:crypto";
 import { normalize } from "./matching.js";
 import { randomClipStart } from "../public/clip-start.js";
 import { wasGuessedWrong } from "../public/guess-history.js";
+import { songCandidates } from "../public/song-selection.js";
 
 const lengths = [0.1, 0.5, 2, 8, 15];
 const fail = (message, status = 400) => {
@@ -10,13 +11,22 @@ const fail = (message, status = 400) => {
   throw error;
 };
 export class LobbyHub {
-  constructor(loadTrack, { now = Date.now, hostGrace = 30000 } = {}) {
+  constructor(
+    loadTrack,
+    { now = Date.now, hostGrace = 30000, random = Math.random } = {},
+  ) {
     this.rooms = new Map();
     this.loadTrack = loadTrack;
     this.now = now;
     this.hostGrace = hostGrace;
+    this.random = random;
   }
-  create(name, pool, owner, { randomStart = false } = {}) {
+  create(
+    name,
+    pool,
+    owner,
+    { randomStart = false, balancePlaylists = false } = {},
+  ) {
     this.prune();
     if (!pool.length) fail("Select at least one imported playlist with songs.");
     if (
@@ -33,6 +43,7 @@ export class LobbyHub {
       code,
       owner,
       randomStart: randomStart === true,
+      balancePlaylists: balancePlaylists === true,
       pool,
       players: new Map(),
       round: null,
@@ -157,6 +168,7 @@ export class LobbyHub {
       serverNow: this.now(),
       poolCount: room.pool.length,
       randomStart: room.randomStart,
+      balancePlaylists: room.balancePlaylists,
       wrongGuesses: round?.wrong.get(player.id) || [],
       players: [...room.players.values()].map((p) => ({
         id: p.id,
@@ -314,17 +326,18 @@ export class LobbyHub {
     if (room.preload) return room.preload;
     const queued = { id: randomUUID(), asset: null, task: null };
     room.preload = queued;
-    let candidates = room.pool.filter((song) => !room.used.has(song.id));
-    if (!candidates.length) {
+    if (
+      !room.balancePlaylists &&
+      room.pool.every((song) => room.used.has(song.id))
+    ) {
       room.used.clear();
-      candidates = room.pool.filter((song) => song.id !== room.round?.seedId);
     }
-    if (!candidates.length) candidates = [...room.pool];
-    else candidates = [...candidates];
-    for (let i = candidates.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [candidates[i], candidates[j]] = [candidates[j], candidates[i]];
-    }
+    const candidates = songCandidates(room.pool, {
+      played: room.used,
+      lastPlayed: room.round?.seedId,
+      balancePlaylists: room.balancePlaylists,
+      random: this.random,
+    });
     queued.task = (async () => {
       for (const seed of candidates.slice(0, 8)) {
         if (!this.rooms.has(room.code)) return null;

@@ -272,6 +272,46 @@ test("starting a round consumes the prepared song while another warms in the bac
   await room.preload.task;
 });
 
+test("lobby preloading balances unequal playlists even after the smaller one is exhausted", async () => {
+  const balancedPool = [
+    ...Array.from({ length: 2 }, (_, index) => ({
+      id: `small-${index}`, poolSources: [{ id: "small", name: "Small mix" }],
+    })),
+    ...Array.from({ length: 20 }, (_, index) => ({
+      id: `large-${index}`, poolSources: [{ id: "large", name: "Large mix" }],
+    })),
+  ];
+  const hub = new LobbyHub(async (seed) => ({ track: seed }), { random: () => 0 });
+  const { room, player } = hub.create("Host", balancedPool, "owner", { balancePlaylists: true });
+  assert.equal(hub.snapshot(room, player).balancePlaylists, true);
+  let previous;
+  for (let round = 0; round < 6; round++) {
+    await hub.next(room);
+    assert.equal(room.round.track.poolSources[0].id, "small");
+    assert.notEqual(room.round.seedId, previous);
+    previous = room.round.seedId;
+  }
+  const normal = hub.create("Normal host", balancedPool, "normal-owner").room;
+  assert.equal(normal.balancePlaylists, false);
+});
+
+test("balanced lobbies try another playlist if the chosen source has no usable preview", async () => {
+  const failed = Array.from({ length: 12 }, (_, index) => ({
+    id: `failed-${index}`, poolSources: [{ id: "failed" }],
+  }));
+  const playable = { id: "playable", poolSources: [{ id: "playable" }] };
+  let attempts = 0;
+  const hub = new LobbyHub(async (seed) => {
+    attempts++;
+    if (seed !== playable) throw new Error("No preview");
+    return { track: seed };
+  }, { random: () => 0 });
+  const { room } = hub.create("Host", [...failed, playable], "owner", { balancePlaylists: true });
+  await room.preload.task;
+  assert.equal(room.preload.asset.seedId, "playable");
+  assert.equal(attempts, 2);
+});
+
 test("only the host's decoded audio sets a room's shared random point", async () => {
   const { hub, room, host, players } = setup();
   room.randomStart = true;

@@ -156,7 +156,7 @@ test("resolver matches artist and title, rejecting unrelated songs and karaoke",
   const seed = { title: "Get Lucky", artist: "Daft Punk" };
   assert.ok(
     matchScore(seed, {
-      title: "Get Lucky (Radio Edit)",
+      title: "Get Lucky (feat. Pharrell Williams & Nile Rodgers)",
       artist: "Daft Punk, Pharrell Williams & Nile Rodgers",
     }) > 0.83,
   );
@@ -185,6 +185,39 @@ test("CSV import handles quoted commas, Spotify headers, dates and duplicate son
     "https://open.spotify.com/track/1234567890123456789012",
   );
   assert.throws(() => parseCSV("Hello,World\na,b"), /Title and Artist/);
+});
+
+test("CSV recording identifiers and album metadata survive import", () => {
+  const playlist = parseCSV('Title,Artist,Album Name,ISRC\nSong,Artist,Live at Wembley,US-AAA-20-00001');
+  assert.equal(playlist.tracks[0].album, "Live at Wembley");
+  assert.equal(playlist.tracks[0].isrc, "USAAA2000001");
+});
+
+test("different Spotify track identifiers are not collapsed by identical display metadata", () => {
+  const playlist = parseCSV('Title,Artist,Track URI\nSong,Artist,spotify:track:0000000000000000000001\nSong,Artist,spotify:track:0000000000000000000002');
+  assert.equal(playlist.tracks.length, 2);
+  assert.equal(mergeSongs(playlist.tracks).length, 2);
+});
+
+test("pool merging keeps studio, live, edit, and distinct recordings separate", () => {
+  const editions = ["Song", "Song (Live)", "Song (Radio Edit)", "Song (Remastered 2011)"];
+  const pool = mergeSongs(editions.map((title, index) => ({ id: String(index), title, artist: "Artist" })));
+  assert.equal(pool.length, 4);
+  const recordings = mergeSongs([
+    { id: "a", title: "Song", artist: "Artist", isrc: "USAAA2000001" },
+    { id: "b", title: "Song", artist: "Artist", isrc: "USAAA2000002" },
+  ]);
+  assert.equal(recordings.length, 2);
+  assert.equal(mergeSongs([
+    { id: "q", title: "Song", artist: "Queen" },
+    { id: "qotsa", title: "Song", artist: "Queens of the Stone Age" },
+  ]).length, 2);
+  assert.equal(mergeSongs(parseCSV("Title,Artist\nSong,Artist").tracks).length, 1,
+    "Missing album metadata is valid for CSV imports");
+  assert.equal(mergeSongs([
+    { id: "guest-one", title: "Song (feat. Guest One)", artist: "Artist" },
+    { id: "guest-two", title: "Song (feat. Guest Two)", artist: "Artist" },
+  ]).length, 2);
 });
 test("Spotify importer validates links and extracts only visible song metadata", async () => {
   const id = "37i9dQZF1DXcBWIGoYBM5M";

@@ -77,9 +77,13 @@ Press Play, then type a title or choose a suggestion. Suggestions combine the wi
 
 Correct answers animate the record and release confetti. The saved slider under Audio & celebration settings runs from 1× (1,500 pieces for two seconds) to 20× (30,000 pieces). Duration increases by two seconds per multiplier and caps at 12 seconds; the default is 1×. Reduced-motion preferences use a smaller, shorter celebration.
 
-Open Sources and check one or more collections. Press Apply & new song to shuffle their combined pool. Overlapping songs are deduplicated, so the same song appearing in two playlists does not receive double the chance of selection. Genre and year controls are under Genre & release years. The app avoids recently served songs until the selected pool is exhausted.
+Open Sources and check one or more collections. Press Apply & new song to shuffle their combined pool. Overlapping songs are deduplicated. Genre and year controls are under Genre & release years. By default, each song in the combined pool has an equal chance, and the app avoids recently served songs until that pool is exhausted.
 
-Revealing a song puts the album artwork on the centre record, with the title, artist, album/year, source, and listening links underneath. Every reveal automatically plays a 30-second snippet, including rounds nobody solved. The record spins during playback. Shorter previews or local files play their available duration. Use the play button to stop or replay the snippet; Next song stops it immediately. A late random starting point shifts back when needed to leave room for the full snippet.
+Enable **Equal playlist chances** under Sources to choose a playlist before choosing a song. Two playlists each get a 50% chance per round, regardless of their sizes; with more playlists, each gets an equal chance. The toggle is off by default, saves across refreshes, and applies from the next song. Lobby hosts can enable the same option before creating a room; it applies to everyone.
+
+Smaller playlists can repeat after their available songs run out, while unseen songs are preferred within each playlist. Shared songs remain a single track and can be selected through either playlist. Only sources with songs matching your filters participate, and unavailable previews can fall back to another source.
+
+Revealing a song puts the album artwork on the centre record, with the title, artist, album/year, source, and listening links underneath. **Open in Spotify** launches the original track in the Spotify app in solo play and lobbies. Every reveal automatically plays a 30-second snippet, including rounds nobody solved. The record spins during playback. Shorter previews or local files play their available duration. Use the play button to stop or replay the snippet; Next song stops it immediately. A late random starting point shifts back when needed to leave room for the full snippet.
 
 While you play, the next song's audio is downloaded and decoded, and artwork loads ahead of the reveal. Solo mode cancels old preloads when you change the collection or filters. Each lobby client holds only the current and upcoming round's media; it reuses the prepared audio when the host starts the next round. Track titles remain withheld from lobby clients until the reveal.
 
@@ -107,7 +111,7 @@ Rooms expire after two hours without activity and are held in server memory. Lob
 
 The Blueprint sets `HOST=0.0.0.0`, `APP_ORIGIN=https://beatguessr.clypdat.xyz`, and generates `SESSION_SECRET` for signed browser sessions. Render supplies `PORT` and `RENDER_EXTERNAL_URL`; its default service URL is also accepted as an application origin. `DATA_DIR` optionally selects a playlist storage directory when using persistent hosting. Use one server instance: active rooms are not shared across instances.
 
-Render's [Free tier](https://render.com/docs/free) sleeps after 15 minutes without inbound traffic and takes about a minute to wake. Its filesystem is ephemeral: imports and rooms are lost on a restart, redeploy, or sleep. Keep your CSV exports so the host can reimport them. This setup has no persistent-storage guarantee.
+Render's [Free tier](https://render.com/docs/free) sleeps after 15 minutes without inbound traffic and takes about a minute to wake. Its filesystem is ephemeral: imports and rooms can be lost on a restart, redeploy, or sleep. The browser saves imported playlist metadata and restores missing imports when you return, including from lobby setup. Active rooms still expire with the server. Keep your CSV exports if you plan to use another browser or device.
 
 After the service is deployed:
 
@@ -123,14 +127,16 @@ The CNAME target must come from the actual deployment; the repository does not a
 The revealed answer shows which selected source supplied the song: the playlist name or Local audio. A song shared by multiple selected sources lists each source once. Deezer or Apple Music listening links identify the audio provider separately.
 
 - **Public Spotify playlists:** paste a playlist URL, URI, or ID. The importer reads the metadata exposed by Spotify's public embed. Embeds can stop at 100 tracks and do not guarantee the complete playlist. They generally omit release years and genres. This is not an official Spotify Web API integration.
-- **CSV:** import complete or private playlists with `Title,Artist,Year,Genre` columns. Only Title and Artist are required. Common export headers such as Track Name, Artist Name(s), Album Release Date, and Track URI are also accepted. Quoted fields and duplicate rows are handled. See `public/example-playlist.csv`.
-- **Local audio:** add MP3, M4A, WAV, OGG, or another browser-supported audio format. Files remain in browser memory for that session. Filenames are parsed as `Artist - Title.ext`. Embedded tags are not read; local files have unknown genre and year.
+- **CSV:** import complete or private playlists with `Title,Artist,Year,Genre` columns. Only Title and Artist are required. Album and ISRC are optional; an ISRC identifies the recording and enables exact provider lookup. Common export headers such as Track Name, Artist Name(s), Album Release Date, Album Name, and Track URI are also accepted. Quoted fields and duplicate rows are handled. See `public/example-playlist.csv`.
+- **Local audio:** add MP3, M4A, WAV, OGG, or another browser-supported audio format. Files are saved in this browser and restored after refreshing or reopening it. They stay on your device. Filenames are parsed as `Artist - Title.ext`. Embedded tags are not read; local files have unknown genre and year.
 
-Imported playlists are automatically combined with the currently selected imported playlists. Select or deselect individual sources using their checkboxes. Stored imports survive server restarts; local audio files must be selected again after a page reload.
+Imported playlists are automatically combined with the currently selected imported playlists. Select or deselect individual sources using their checkboxes. CSV and Spotify playlist metadata are saved in this browser; if the server loses its imports, they are restored automatically and your source selections follow the restored playlists. Local audio files and their selections also survive browser restarts. Adding the same unchanged local file again does not duplicate it.
+
+Under **Manage imports**, Remove deletes a playlist's saved copy as well as its server import. Remove beside Local audio clears the saved audio files. Storage belongs to this browser and site: localhost and the hosted website have separate libraries. Clearing the site's browser data removes its saved files. If browser storage is unavailable or full, files remain usable in the current session and a message explains that they were not saved.
 
 Tracks with unknown years are included with All years and excluded from narrower ranges. Unknown genres appear under All genres or Unknown. A CSV containing those fields is the most reliable way to filter an imported playlist.
 
-Audio is matched to public Deezer or Apple Music preview excerpts. Matching requires both artist and title and rejects karaoke/tribute results. Missing or failed previews are skipped after bounded retries. The game does not depend on SongSpot's API or audio server. It does not play Spotify streams.
+Audio is matched to public Deezer or Apple Music preview excerpts. Matching requires the same title and primary artist. Version labels in titles, provider metadata, and album names prevent studio tracks from being replaced by live, acoustic, remixed, edited, or remastered alternatives. An explicitly requested version must match its version details, and different editions remain separate in combined playlists. If an imported ISRC is present, the resolver requires that recording ID. Missing, mismatched, or failed previews are skipped after bounded retries. Provider metadata cannot establish the identity of an unlabeled alternate recording; local audio supplies the exact file. The game does not depend on SongSpot's API or audio server. It does not play Spotify streams.
 
 Preview excerpts usually start in the middle of the recording. **Use local audio for actual song intros.** Random starting point picks a fixed offset for that round, leaving room for the 15-second stage. The Web Audio clock, rather than a JavaScript timeout, controls clip duration. Short local files play only as much audio as they contain.
 
@@ -148,9 +154,11 @@ spicetify apply
 
 All three commands are needed: copying or downloading the file only installs it on disk. `spicetify config extensions beatguessr-export.js` enables the extension alongside your existing extensions, and `spicetify apply` loads it into Spotify and restarts the client. If the export menu is missing, run `spicetify config extensions` and check that `beatguessr-export.js` appears in the list, then run `spicetify apply` again.
 
-Then right-click a playlist in Spotify and choose **Export for BeatGuessr**. Import the downloaded CSV here. The exporter reads successive pages, including when Spotify returns fewer entries than requested. It supports up to 10,000 entries and stops with an error if pages repeat or end before the reported total. It includes the original playlist URL, so importing its CSV replaces the matching partial Spotify import while keeping the source selected.
+Then right-click a playlist or **Liked Songs** in Spotify and choose **Export for BeatGuessr**. Import the downloaded CSV here. The exporter waits for Spicetify's menu renderer before registering, including after a Spotify restart. It reads successive pages, including when Spotify returns fewer entries than requested or reports an unreliable zero total. It supports up to 10,000 entries and stops with an error if pages repeat or end before a known total. Normal playlist exports include the original playlist URL, so importing their CSV replaces the matching partial Spotify import while keeping the source selected.
 
-Applying Spicetify can restart Spotify. Pagination is covered by automated tests, including a 350-song playlist, but this optional integration has not been validated in a live Spotify session; its internal API can change between Spotify versions.
+Exports also include Album and ISRC when Spotify provides those fields. Browser backups retain them so restoring a playlist preserves its recording identifiers.
+
+Applying Spicetify can restart Spotify. Pagination and startup timing are covered by automated tests, including a 350-song playlist. The installed exporter was also checked in Spotify's playlist and Liked Songs menus, and a live export retained all 796 Liked Songs track IDs. Internal Spotify APIs can change between versions.
 
 ### Why pasted Spotify links can stop at 100 songs
 
@@ -177,7 +185,7 @@ Spotify's [developer policy](https://developer.spotify.com/policy) prohibits gam
 | `server/playlists.js`                       | Spotify embed and CSV parsing                                    |
 | `research/songspot-analysis.md`             | Public-client reverse engineering and evidence                   |
 
-No player accounts, database service, music API keys, or frontend build step are required. Settings and the most recent 2,000 served song IDs are stored in browser localStorage. Solo session scores reset on reload; lobby scores remain on the running server and rejoining uses a token stored in that tab's sessionStorage. Playlist metadata is saved to `data/playlists.json` or `DATA_DIR`. Decoded previews and a bounded server audio cache are transient. Network access is required for provider previews and imports; imported local audio can play offline once the local app is open.
+No player accounts, database service, music API keys, or frontend build step are required. Settings and the most recent 2,000 served song IDs are stored in browser localStorage. IndexedDB stores playlist backups and local audio files. Solo session scores reset on reload; lobby scores remain on the running server and rejoining uses a token stored in that tab's sessionStorage. Server playlist metadata is saved to `data/playlists.json` or `DATA_DIR`. Decoded previews and a bounded server audio cache are transient. Network access is required for provider previews and imports; imported local audio can play offline once the local app is open.
 
 ## Check
 
@@ -195,6 +203,12 @@ npm run test:browser
 ```
 
 Keep the server running for browser tests. They use real provider audio and create/delete their own CSV test playlists. Checks cover all five clip schedules, skip and guess progression, correct-answer confetti, combined playlist deduplication, source checkboxes, year/genre filters, aligned desktop panels, mobile overflow, and browser errors. Screenshots are written to `test-results/`. Provider availability can affect the live tests.
+
+`npm run test:artwork` starts its own server and checks that preloaded album covers stay hidden while guessing and appear after correct guesses and unsolved reveals. It uses fixed audio and images, requires Playwright Chromium, and runs in CI. Set `BEATGUESSR_ARTWORK_BASE_URL` to a hosted app URL to check that deployment's frontend with the same fixtures.
+
+`npm run test:storage` checks saved audio bytes and playlist selections across refreshes, browser restarts, and an empty server restart. It also checks simultaneous recovery from multiple tabs, private imports, removing saved files, and unavailable or full browser storage. It uses temporary server storage and a temporary browser profile, requires Playwright Chromium, and runs in CI.
+
+`npm run test:playback` checks solo Skip transitions from 0.5 to 2, 8, and 15 seconds against the actual Web Audio schedule. The recording and random starting point must stay fixed, and each stage must begin exactly where the previous one ended. Set `BEATGUESSR_PLAYBACK_BASE_URL` to check a hosted frontend with the same local audio fixture.
 
 `npm run test:lobby` starts its own server with temporary storage and deterministic audio, then opens four independent browser sessions. It checks private imports, joining, host permissions, shared playback timestamps, votes, scores, solved and unsolved 30-second reveals, host transfer, rejoining, and mobile layout. It requires Playwright Chromium but no running app or music-provider connection.
 

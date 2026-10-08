@@ -1,6 +1,13 @@
 import { ClipPlayer, CLIP_LENGTHS } from "./audio.js";
 import { celebrate, confettiMultiplier } from "./confetti.js";
 import { mergeSuggestions } from "./guess-search.js";
+import { songCandidates } from "./song-selection.js";
+import { recordingKey } from "./recording.js";
+import { spotifyAppURL } from "./spotify-links.js";
+import {
+  restoredPlaylists, rememberPlaylist, forgetPlaylist,
+  savedAudio, rememberAudio, clearAudio, cacheErrorMessage,
+} from "./library-cache.js";
 import {
   normalizeGuess as cleanTitle,
   wasGuessedWrong,
@@ -38,6 +45,7 @@ const state = {
   done: false,
   won: false,
   randomStart: settings.randomStart === true,
+  balancePlaylists: settings.balancePlaylists === true,
   selectedSources: Array.isArray(settings.sources)
     ? settings.sources
     : [settings.source || "curated"],
@@ -77,15 +85,10 @@ function prepareNextSong() {
   const pool = state.pool,
     controller = new AbortController(),
     signal = controller.signal;
-  const unseen = pool.filter((song) => !state.played.includes(song.id));
-  const alternatives = pool.filter((song) => song.id !== state.played[0]);
-  const candidates = [
-    ...(unseen.length ? unseen : alternatives.length ? alternatives : pool),
-  ];
-  for (let i = candidates.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [candidates[i], candidates[j]] = [candidates[j], candidates[i]];
-  }
+  const candidates = songCandidates(pool, {
+    played: state.played,
+    balancePlaylists: state.balancePlaylists,
+  });
   const task = (async () => {
     let lastError;
     for (const seed of candidates.slice(0, 8)) {
@@ -196,12 +199,13 @@ function updateRandomStartHint() {
 }
 function saveSettings() {
   persist("beatguessr:settings", {
-    sources: state.selectedSources.filter((id) => id !== "local"),
+    sources: state.selectedSources,
     genre: $("genre").value,
     from: $("year-from").value,
     to: $("year-to").value,
     volume: $("volume").value,
     randomStart: state.randomStart,
+    balancePlaylists: state.balancePlaylists,
     autoPlay: $("auto-play").checked,
     confettiMultiplier: Number($("confetti-amount").value),
   });
@@ -313,16 +317,18 @@ function showReveal(won) {
       $("reveal-cover").src = song.cover;
   } else $("reveal-cover").removeAttribute("src");
   $("reveal-links").replaceChildren();
-  for (const [href, label] of [
-    [song.listenUrl, `Listen on ${song.source} ↗`],
-    [song.spotifyUrl, "Open in Spotify ↗"],
+  for (const [href, label, browser] of [
+    [song.listenUrl, `Listen on ${song.source} ↗`, true],
+    [spotifyAppURL(song.spotifyUrl), "Open in Spotify", false],
   ]) {
     if (!href) continue;
     const link = document.createElement("a");
     link.href = href;
     link.textContent = label;
-    link.target = "_blank";
-    link.rel = "noopener noreferrer";
+    if (browser) {
+      link.target = "_blank";
+      link.rel = "noopener noreferrer";
+    }
     $("reveal-links").append(link);
   }
   message(
@@ -438,6 +444,9 @@ function sourceOptions() {
     { id: "local", name: "Local audio", count: state.local.length },
   ];
 }
+function cacheStatus(text = "Imports and local audio are saved in this browser.") {
+  $("library-cache-status").textContent = text;
+}
 function updateSourceLabel() {
   const selected = sourceOptions().filter((s) =>
     state.selectedSources.includes(s.id),
@@ -448,13 +457,15 @@ function updateSourceLabel() {
       : `${selected.length} sources selected ▾`;
 }
 async function refreshSources(selected = state.selectedSources) {
-  const data = await api("/api/playlists");
+  const data = await restoredPlaylists(api);
+  if (data.warning) cacheStatus(data.warning);
   state.playlists = data.playlists;
   state.builtIns = data.builtIns || [];
   const options = sourceOptions();
-  state.selectedSources = (
+  state.selectedSources = [...new Set((
     Array.isArray(selected) ? selected : [selected]
-  ).filter((id) => options.some((s) => s.id === id));
+  ).map((id) => data.sourceMap.get(id) || id)
+    .filter((id) => options.some((s) => s.id === id)))];
   if (!state.selectedSources.length && state.builtIns.length)
     state.selectedSources = ["curated"];
   $("source-dropdown").replaceChildren();
@@ -495,11 +506,32 @@ async function refreshSources(selected = state.selectedSources) {
         await api(`/api/playlists/${encodeURIComponent(playlist.id)}`, {
           method: "DELETE",
         });
+        await forgetPlaylist(playlist.id);
         await refreshSources();
         await applyFilters();
       } catch (error) {
         message(error.message, "error");
       }
+    });
+    row.append(name, remove);
+    $("playlist-management").append(row);
+  }
+  if (state.local.length) {
+    const row = document.createElement("div");
+    row.className = "playlist-row";
+    const name = document.createElement("span");
+    name.textContent = `Local audio · ${state.local.length} files`;
+    const remove = document.createElement("button");
+    remove.className = "text-button danger";
+    remove.textContent = "Remove";
+    remove.dataset.remove = "local";
+    remove.addEventListener("click", async () => {
+      try {
+        await clearAudio();
+        state.local = [];
+        await refreshSources(state.selectedSources.filter((id) => id !== "local"));
+        await applyFilters();
+      } catch (error) { cacheStatus(cacheErrorMessage(error)); }
     });
     row.append(name, remove);
     $("playlist-management").append(row);
@@ -543,7 +575,12 @@ async function applyFilters() {
       : [];
     const combined = new Map();
     for (const song of [...data.tracks, ...local]) {
-      const key = `${cleanTitle(song.title)}|${cleanTitle(song.artist)}`;
+      let key = `${recordingKey(song)}|${cleanTitle(song.artist)}`;
+      if (combined.get(key)?.isrc && song.isrc && combined.get(key).isrc !== song.isrc)
+        key += `|${song.isrc}`;
+      if (combined.get(key)?.spotifyUrl && song.spotifyUrl &&
+        combined.get(key).spotifyUrl !== song.spotifyUrl &&
+        (!song.isrc || combined.get(key).isrc !== song.isrc)) key += `|${song.spotifyUrl}`;
       const previous = combined.get(key);
       combined.set(key, {
         ...song,
@@ -854,6 +891,13 @@ $("random-start").addEventListener("change", () => {
   if (!state.loading && state.track)
     $("play-text").textContent = playbackLabel();
 });
+$("balance-playlists").addEventListener("change", () => {
+  state.balancePlaylists = $("balance-playlists").checked;
+  saveSettings();
+  nextSong?.controller.abort();
+  nextSong = null;
+  if (!state.loading && state.track) nextSong = prepareNextSong();
+});
 $("auto-play").addEventListener("change", saveSettings);
 function updateConfettiSetting() {
   const multiplier = confettiMultiplier($("confetti-amount").value);
@@ -899,6 +943,10 @@ async function importPlaylist(input) {
       method: "POST",
       body: JSON.stringify(input),
     });
+    try {
+      await rememberPlaylist(playlist, api);
+      cacheStatus();
+    } catch (error) { cacheStatus(cacheErrorMessage(error)); }
     const existing = state.selectedSources.filter((id) => id !== "curated");
     await refreshSources([...new Set([...existing, playlist.id])]);
     $("import-dialog").close();
@@ -928,6 +976,7 @@ $("csv-file").addEventListener("change", async () => {
   $("csv-file").value = "";
 });
 $("local-files").addEventListener("change", async () => {
+  const added = [];
   for (const file of $("local-files").files) {
     if (file.size > 100 * 1024 * 1024) {
       message("Local audio files must be under 100 MB each.", "error");
@@ -938,7 +987,9 @@ $("local-files").addEventListener("change", async () => {
     const artist =
       separator >= 0 ? name.slice(0, separator) : "Local collection";
     const title = separator >= 0 ? name.slice(separator + 3) : name;
-    state.local.push({
+    const fileKey = `${file.name}:${file.size}:${file.lastModified}`;
+    if (state.local.some((track) => track.fileKey === fileKey)) continue;
+    const track = {
       id: `local:${crypto.randomUUID()}`,
       title,
       artist,
@@ -947,8 +998,15 @@ $("local-files").addEventListener("change", async () => {
       origin: "local",
       poolSources: [{ id: "local", name: "Local audio" }],
       file,
-    });
+      fileKey,
+    };
+    state.local.push(track);
+    added.push(track);
   }
+  try {
+    await rememberAudio(added);
+    cacheStatus();
+  } catch (error) { cacheStatus(cacheErrorMessage(error)); }
   await refreshSources([
     ...new Set([
       ...state.selectedSources.filter((id) => id !== "curated"),
@@ -979,11 +1037,14 @@ async function init() {
   player.setVolume(Number($("volume").value) / 100);
   $("random-start").checked = state.randomStart;
   $("auto-play").checked = settings.autoPlay ?? true;
+  $("balance-playlists").checked = state.balancePlaylists;
   $("confetti-amount").value = confettiMultiplier(
     settings.confettiMultiplier ?? 1,
   );
   updateConfettiSetting();
   try {
+    try { state.local = await savedAudio(); }
+    catch (error) { cacheStatus(cacheErrorMessage(error)); }
     await refreshSources();
     const data = await api(
       `/api/catalog?sources=${encodeURIComponent(state.selectedSources.filter((id) => id !== "local").join(","))}`,

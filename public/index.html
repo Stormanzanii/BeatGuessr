@@ -42,6 +42,13 @@
           Select multiple sources to combine their songs. Duplicate songs are
           counted once.
         </div>
+        <label class="toggle-row" for="balance-playlists">
+          <input id="balance-playlists" type="checkbox" autocomplete="off" />
+          Equal playlist chances
+        </label>
+        <p class="muted small">
+          50/50 with two playlists, regardless of size. Applies from the next song.
+        </p>
         <details class="filter-settings">
           <summary>Genre & release years</summary>
           <div class="filter-row">
@@ -100,9 +107,11 @@
             hidden
           />
         </div>
+        <p class="muted small" id="library-cache-status" role="status">
+          Imports and local audio are saved in this browser.
+        </p>
         <p class="muted small">
-          Local files stay in this browser session. Use filenames like “Artist -
-          Title.mp3”.
+          Use filenames like “Artist - Title.mp3”. Remove saved files under Manage imports.
         </p>
         <details class="manage-sources">
           <summary>Manage imports</summary>

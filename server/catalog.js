@@ -1,3 +1,5 @@
+import { recordingKey, sameArtist } from "../public/recording.js";
+
 // Original release years, rather than the date of a later compilation/reissue.
 // Format: title | artist | year | genre
 const rows = `
@@ -252,28 +254,17 @@ export const catalog = rows
   });
 
 export function mergeSongs(...collections) {
-  const key = (value) =>
-    value
-      .normalize("NFKD")
-      .replace(/\p{M}/gu, "")
-      .toLowerCase()
-      .replace(
-        /\s*[-(]\s*(remaster(ed)?|radio edit|single version|album version).*$/i,
-        "",
-      )
-      .replace(/[^\p{L}\p{N}]/gu, "");
   const byTitle = new Map();
   const output = [];
   for (const song of collections.flat()) {
-    const title = key(song.title),
-      artist = key(song.artist);
+    const title = recordingKey(song);
     const candidates = byTitle.get(title) || [];
     const duplicate = candidates.find(
       (existing) =>
-        existing.id === song.id ||
-        (artist &&
-          (key(existing.artist).includes(artist) ||
-            artist.includes(key(existing.artist)))),
+        (!existing.isrc || !song.isrc || existing.isrc === song.isrc) &&
+        (!existing.spotifyUrl || !song.spotifyUrl || existing.spotifyUrl === song.spotifyUrl ||
+          (existing.isrc && existing.isrc === song.isrc)) &&
+        (existing.id === song.id || sameArtist(existing.artist, song.artist)),
     );
     if (duplicate) {
       duplicate.year ??= song.year;
@@ -281,6 +272,8 @@ export function mergeSongs(...collections) {
         duplicate.genre = song.genre;
       duplicate.spotifyUrl ||= song.spotifyUrl;
       duplicate.deezerId ||= song.deezerId;
+      duplicate.album ||= song.album;
+      duplicate.isrc ||= song.isrc;
       if (duplicate.poolSources || song.poolSources) {
         duplicate.poolSources = [
           ...new Map(
