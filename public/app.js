@@ -5,6 +5,7 @@ import { songCandidates, nextPlaylist, SONG_ATTEMPTS } from "./song-selection.js
 import { recordingKey } from "./recording.js";
 import { spotifyAppURL } from "./spotify-links.js";
 import { trackSuggestions } from "./suggestion-position.js";
+import { RecordVisualizer } from "./visualizer.js";
 import {
   setupThemePicker,
   setAmbientCover,
@@ -45,6 +46,16 @@ const persist = (key, value) => {
   } catch {}
 };
 const settings = readStored("beatguessr:settings", {});
+function savedStats() {
+  const saved = readStored("beatguessr:stats", {});
+  const count = (value) =>
+    Number.isInteger(value) && value >= 0 ? value : 0;
+  return {
+    solved: count(saved.solved),
+    streak: count(saved.streak),
+    best: Number.isFinite(saved.best) && saved.best >= 0 ? saved.best : null,
+  };
+}
 const state = {
   pool: [],
   playlists: [],
@@ -65,8 +76,12 @@ const state = {
   round: 0,
   request: 0,
   played: readStored("beatguessr:played", []).slice(0, 2000),
-  stats: { solved: 0, streak: 0, best: null },
-  recent: [],
+  // The scoreboard is kept in this browser, so it outlives reloads and
+  // new deploys.
+  stats: savedStats(),
+  recent: readStored("beatguessr:recent", [])
+    .filter((song) => song && typeof song.title === "string")
+    .slice(0, 5),
   wrong: [],
   suggestionIndex: -1,
 };
@@ -74,14 +89,20 @@ const state = {
 const player = new ClipPlayer(
   (progress) => {
     $("audio-progress").style.width = `${progress * 100}%`;
-    setProgress(progress);
+    setProgress(progress, $("game-heading"), $("play-button"));
   },
   (playing) => {
     $("record")?.classList.toggle("spinning", playing);
     document.body.classList.toggle("is-playing", playing);
+    if (playing) visualizer.start();
     $("play-icon").textContent = playing ? "Ⅱ" : "▶";
     if (!state.loading) $("play-text").textContent = playbackLabel(playing);
   },
+);
+const visualizer = new RecordVisualizer(
+  document.querySelector(".record-slot .visualizer"),
+  $("record"),
+  player,
 );
 // Useful for inspecting actual audio scheduling in browser devtools.
 window.beatguessr = { state, player };
@@ -249,19 +270,24 @@ function setStage(index) {
   $("skip-button").innerHTML =
     index === 4 ? "Reveal <span>↗</span>" : "Skip <span>↗</span>";
 }
-function setStat(id, value) {
+function setStat(id, value, animate = true) {
   const element = $(id);
   if (element.textContent === String(value)) return;
   element.textContent = value;
+  if (!animate) return;
   // Restart the bump animation on every change.
   element.classList.remove("bump");
   void element.offsetWidth;
   element.classList.add("bump");
 }
-function updateStats() {
-  setStat("stat-solved", state.stats.solved);
-  setStat("stat-streak", state.stats.streak);
-  setStat("stat-best", state.stats.best == null ? "—" : `${state.stats.best}s`);
+function updateStats(animate = true) {
+  setStat("stat-solved", state.stats.solved, animate);
+  setStat("stat-streak", state.stats.streak, animate);
+  setStat(
+    "stat-best",
+    state.stats.best == null ? "—" : `${state.stats.best}s`,
+    animate,
+  );
 }
 function updateRecent() {
   const list = $("recent-tracks");
@@ -305,6 +331,17 @@ function showReveal(won) {
       state.stats.best == null ? seconds : Math.min(state.stats.best, seconds);
   } else state.stats.streak = 0;
   state.recent.unshift({ ...song, won, seconds });
+  state.recent = state.recent.slice(0, 5);
+  persist("beatguessr:stats", state.stats);
+  persist(
+    "beatguessr:recent",
+    state.recent.map(({ title, artist, won, seconds }) => ({
+      title,
+      artist,
+      won,
+      seconds,
+    })),
+  );
   updateStats();
   updateRecent();
   setLoading(false);
@@ -1088,6 +1125,8 @@ async function init() {
     settings.confettiMultiplier ?? 1,
   );
   updateConfettiSetting();
+  updateStats(false);
+  if (state.recent.length) updateRecent();
   try {
     try { state.local = await savedAudio(); }
     catch (error) { cacheStatus(cacheErrorMessage(error)); }

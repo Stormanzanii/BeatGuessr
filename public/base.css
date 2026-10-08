@@ -86,6 +86,27 @@ p {
   min-width: 0;
 }
 
+/* Visualiser ring: positioned by visualizer.js around the record, behind it. */
+.record-slot,
+.room-record-wrap {
+  position: relative;
+}
+/* The ring is resized on the next frame after a layout change; until then
+   it must not be able to widen the page. */
+.record-scene,
+.room-record-wrap {
+  overflow-x: clip;
+}
+.visualizer {
+  position: absolute;
+  z-index: 0;
+  pointer-events: none;
+}
+.record,
+.lobby-record {
+  z-index: 1;
+}
+
 .theme-picker {
   display: inline-flex;
   align-items: center;
@@ -106,6 +127,38 @@ p {
   height: 100vh;
   pointer-events: none;
   z-index: 9999;
+}
+
+/* Desktop windows tall enough to hold the game: the solo page fits the
+   viewport instead of scrolling. Side panels scroll inside themselves and
+   the record scales to whatever room its scene is given (themes size it in
+   cq units against .record-scene). */
+@media (min-width: 1000px) and (min-height: 680px) {
+  body:has(.workspace) {
+    height: 100dvh;
+    min-height: 0;
+  }
+  body:has(.workspace) .workspace {
+    flex: 1 1 0;
+    min-height: 0;
+  }
+  body:has(.workspace) .library,
+  body:has(.workspace) .session {
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+  }
+  body:has(.workspace) .game {
+    min-height: 0;
+  }
+  body:has(.workspace) .record-scene {
+    container-type: size;
+    min-height: 140px;
+  }
+  body:has(.workspace) footer {
+    flex: none;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

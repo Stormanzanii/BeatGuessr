@@ -4,11 +4,8 @@ import { wasGuessedWrong, nextEnabledSuggestion } from "./guess-history.js";
 import { restoredPlaylists, rememberPlaylist, cacheErrorMessage } from "./library-cache.js";
 import { spotifyAppURL } from "./spotify-links.js";
 import { trackSuggestions } from "./suggestion-position.js";
-import {
-  setupThemePicker,
-  setAmbientCover,
-  setProgress,
-} from "./theme.js";
+import { setupThemePicker, setAmbientCover } from "./theme.js";
+import { RecordVisualizer } from "./visualizer.js";
 
 const $ = (id) => document.getElementById(id);
 setupThemePicker($("theme-select"));
@@ -45,15 +42,18 @@ let suggestions = [],
 const celebrated = new Set();
 const mediaCache = new Map();
 const player = new ClipPlayer(
-  (progress) => {
-    $("room-progress").style.width = `${progress * 100}%`;
-    setProgress(progress);
-  },
+  (progress) => ($("room-progress").style.width = `${progress * 100}%`),
   (playing) => {
     $("lobby-record").classList.toggle("spinning", playing);
     document.body.classList.toggle("is-playing", playing);
+    if (playing) visualizer.start();
     updatePersonalPlayback();
   },
+);
+const visualizer = new RecordVisualizer(
+  document.querySelector(".room-record-wrap .visualizer"),
+  $("lobby-record"),
+  player,
 );
 window.beatguessrLobby = {
   player,

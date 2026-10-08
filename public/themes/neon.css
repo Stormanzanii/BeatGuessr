@@ -2940,3 +2940,179 @@ footer {
     display: none;
   }
 }
+
+/* ---------------------------------------------------------------------------
+   Desktop layout: Dashboard. Library runs down the left; the game fills the
+   main area and the scoreboard sits beneath it as a strip of three tiles:
+   stats, playback, recent songs.
+   --------------------------------------------------------------------------- */
+@media (min-width: 1000px) {
+  .topbar-inner {
+    max-width: none;
+    padding: 0 clamp(16px, 2vw, 40px);
+  }
+  .workspace {
+    max-width: none;
+    margin-top: clamp(14px, 1.6vw, 28px);
+    padding: 0 clamp(16px, 2vw, 40px);
+    gap: clamp(14px, 1.4vw, 22px);
+    grid-template-columns: clamp(280px, 21vw, 360px) minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "lib game"
+      "lib score";
+  }
+  .panel {
+    min-height: 0;
+  }
+  .library {
+    grid-area: lib;
+  }
+  .game {
+    grid-area: game;
+    padding: clamp(22px, 2vw, 36px) clamp(26px, 3vw, 56px) 18px;
+  }
+  .game h1 {
+    font-size: clamp(30px, 2.6vw, 48px);
+  }
+  .record {
+    width: clamp(220px, 19vw, 340px);
+    height: clamp(220px, 19vw, 340px);
+  }
+  .session {
+    grid-area: score;
+    display: grid;
+    grid-template-columns:
+      minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.2fr);
+    grid-template-rows: auto auto auto;
+    column-gap: clamp(20px, 2.4vw, 40px);
+    padding: 18px clamp(20px, 2vw, 30px);
+  }
+  .session > .panel-head {
+    grid-column: 1;
+    grid-row: 1;
+  }
+  .session > .stats {
+    grid-column: 1;
+    grid-row: 2;
+    margin-top: 8px;
+  }
+  .session > .best-stat {
+    grid-column: 1;
+    grid-row: 3;
+  }
+  .session > .panel-section:not(.recent) {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    margin: 0;
+  }
+  .session > .panel-section:not(.recent) > .section-label {
+    margin-top: 6px;
+  }
+  .session > .settings {
+    grid-column: 2;
+    grid-row: 3;
+    align-self: end;
+  }
+  .session > .recent {
+    grid-column: 3;
+    grid-row: 1 / span 3;
+    margin: 0;
+    max-height: 250px;
+    overflow-y: auto;
+    scrollbar-width: thin;
+  }
+  .session > .recent > .section-label {
+    margin-top: 6px;
+  }
+  .stats strong {
+    font-size: clamp(28px, 2vw, 40px);
+  }
+}
+@media (min-width: 1000px) and (min-height: 680px) {
+  .session {
+    max-height: 290px;
+  }
+  .record {
+    width: min(84cqmin, 420px);
+    height: min(84cqmin, 420px);
+  }
+}
+
+:root {
+  --viz-color: var(--accent);
+  --viz-glow: var(--accent-glow);
+}
+
+/* The dashboard leaves the game less height, so the record sits beside the
+   controls instead of above them. */
+@media (min-width: 1000px) {
+  .game {
+    display: grid;
+    grid-template-columns: minmax(0, 0.9fr) minmax(340px, 1fr);
+    grid-template-rows: minmax(0, 1fr) repeat(11, auto) minmax(0, 1fr);
+    column-gap: clamp(20px, 2.4vw, 48px);
+  }
+  .game > * {
+    grid-column: 2;
+  }
+  .game > .record-scene {
+    grid-column: 1;
+    grid-row: 1 / -1;
+    padding: 0;
+  }
+  .game > .game-top {
+    grid-row: 2;
+  }
+  .game > h1 {
+    grid-row: 3;
+  }
+  .game > .instructions {
+    grid-row: 4;
+  }
+  .game > .reveal {
+    grid-row: 5;
+  }
+  .game > .listen-caption {
+    grid-row: 6;
+    margin: 16px 0 12px;
+    text-align: left;
+  }
+  .game > .player {
+    grid-row: 7;
+  }
+  .game > .clip-control {
+    grid-row: 8;
+  }
+  .game > #guess-form {
+    grid-row: 9;
+  }
+  .game > .message {
+    grid-row: 10;
+  }
+  .game > .guess-history {
+    grid-row: 11;
+  }
+  .game > .game-bottom {
+    grid-row: 12;
+  }
+  .reveal {
+    align-items: flex-start;
+    text-align: left;
+  }
+  #reveal-links {
+    justify-content: flex-start;
+  }
+  .game.is-revealed .record-scene {
+    min-height: 0;
+  }
+}
+@media (min-width: 1000px) and (min-height: 680px) {
+  .session {
+    max-height: 240px;
+  }
+  .record {
+    width: min(66cqmin, 400px);
+    height: min(66cqmin, 400px);
+  }
+}

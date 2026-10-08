@@ -76,13 +76,21 @@ a {
    slowly in opposite directions. Before the first reveal it uses a warm
    gradient instead, so it never gives an answer away.
    --------------------------------------------------------------------------- */
+/* Drawn at a quarter of the viewport and scaled up 4x: the blur hides the
+   lower resolution, and the GPU holds 1/16 of the pixels. Full-size blurred
+   layers ran out of tile memory and showed as black boxes. */
 .ambient {
   display: block;
   position: fixed;
-  inset: 0;
+  top: 0;
+  left: 0;
+  width: 25vw;
+  height: 25vh;
   z-index: -1;
   overflow: hidden;
   filter: saturate(2.2) brightness(0.62);
+  transform: scale(4);
+  transform-origin: 0 0;
   pointer-events: none;
 }
 .ambient::after {
@@ -98,7 +106,7 @@ a {
   border-radius: 100em;
   background: var(--ambient-cover, var(--ambient-fallback)) center / cover
     no-repeat;
-  filter: blur(60px);
+  filter: blur(15px);
   animation: bg-turn 48s linear infinite;
   will-change: transform;
 }
@@ -2381,4 +2389,120 @@ footer {
   .ambient-layer:nth-child(n + 2) {
     display: none;
   }
+}
+
+/* ---------------------------------------------------------------------------
+   Desktop layout: Now Playing. The record holds the left half of the game
+   the way the cover does in Spicy Lyrics; the right half reads top to bottom
+   like the lyric column. Scoreboard and Library share a rail on the right.
+   --------------------------------------------------------------------------- */
+@media (min-width: 1000px) {
+  .workspace {
+    max-width: none;
+    margin-top: clamp(14px, 1.6vw, 28px);
+    padding: 0 clamp(16px, 2vw, 40px);
+    gap: clamp(14px, 1.4vw, 24px);
+    grid-template-columns: minmax(0, 1fr) clamp(290px, 22vw, 380px);
+    grid-template-rows: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-areas:
+      "game score"
+      "game lib";
+  }
+  .topbar-inner {
+    max-width: none;
+    padding: 0 clamp(16px, 2vw, 40px);
+  }
+  .game {
+    grid-area: game;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(360px, 1fr);
+    grid-template-rows: minmax(0, 1fr) repeat(11, auto) minmax(0, 1fr);
+    column-gap: clamp(24px, 3vw, 72px);
+    padding: clamp(24px, 2.4vw, 48px);
+  }
+  .session {
+    grid-area: score;
+  }
+  .library {
+    grid-area: lib;
+  }
+  .game > * {
+    grid-column: 2;
+  }
+  .game > .record-scene {
+    grid-column: 1;
+    grid-row: 1 / -1;
+    padding: 0;
+  }
+  .game > .game-top {
+    grid-row: 2;
+  }
+  .game > h1 {
+    grid-row: 3;
+  }
+  .game > .instructions {
+    grid-row: 4;
+  }
+  .game > .reveal {
+    grid-row: 5;
+  }
+  .game > .listen-caption {
+    grid-row: 6;
+  }
+  .game > .player {
+    grid-row: 7;
+  }
+  .game > .clip-control {
+    grid-row: 8;
+  }
+  .game > #guess-form {
+    grid-row: 9;
+  }
+  .game > .message {
+    grid-row: 10;
+  }
+  .game > .guess-history {
+    grid-row: 11;
+  }
+  .game > .game-bottom {
+    grid-row: 12;
+  }
+  .game h1 {
+    font-size: clamp(44px, 4.4vw, 92px);
+  }
+  .listen-caption {
+    margin: 22px 0 14px;
+    text-align: left;
+    font-size: clamp(18px, 1.4vw, 24px);
+  }
+  .reveal {
+    align-items: flex-start;
+    text-align: left;
+    margin: 18px 0 0;
+  }
+  #reveal-links {
+    justify-content: flex-start;
+  }
+  .game.is-revealed .record-scene {
+    min-height: 0;
+  }
+  .record-slot {
+    width: clamp(220px, 20vw, 420px);
+    height: clamp(220px, 20vw, 420px);
+  }
+  .stats strong {
+    font-size: clamp(34px, 2.6vw, 52px);
+  }
+}
+@media (min-width: 1000px) and (min-height: 680px) {
+  /* Leaves room for the visualiser ring, which reaches 1.44x the record. */
+  .record-slot {
+    width: min(64cqmin, 480px);
+    height: min(64cqmin, 480px);
+  }
+}
+
+:root {
+  --viz-color: rgba(255, 255, 255, 0.88);
+  --viz-glow: rgba(255, 255, 255, 0.7);
 }

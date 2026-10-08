@@ -46,23 +46,28 @@ try {
   );
   console.log("Live provider:", JSON.stringify(initial));
   await page.screenshot({ path: "test-results/desktop.png", fullPage: true });
+  // Each theme arranges the three panels differently; whatever the layout,
+  // none may overlap another or run past the window.
   const panels = await page
     .locator(".workspace > .panel")
     .evaluateAll((elements) =>
-      elements.map((el) => ({
-        top: el.getBoundingClientRect().top,
-        bottom: el.getBoundingClientRect().bottom,
-      })),
+      elements.map((el) => {
+        const r = el.getBoundingClientRect();
+        return { left: r.left, right: r.right, top: r.top, bottom: r.bottom };
+      }),
     );
   assert.equal(panels.length, 3);
-  assert.ok(
-    panels.every(
-      (p) =>
-        Math.abs(p.top - panels[0].top) < 1 &&
-        Math.abs(p.bottom - panels[0].bottom) < 1,
-    ),
-    "All three panels must have aligned top and bottom edges",
-  );
+  for (const [i, a] of panels.entries()) {
+    assert.ok(a.left >= 0 && a.right <= 1440, "Panels must fit the window width");
+    for (const b of panels.slice(i + 1))
+      assert.ok(
+        a.right <= b.left + 1 ||
+          b.right <= a.left + 1 ||
+          a.bottom <= b.top + 1 ||
+          b.bottom <= a.top + 1,
+        "Panels must not overlap",
+      );
+  }
   const guessBounds = await page.locator("#guess").boundingBox();
   const skipBounds = await page.locator("#skip-button").boundingBox();
   assert.ok(

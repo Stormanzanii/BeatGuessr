@@ -9,23 +9,25 @@ export class ClipPlayer {
     this.volume = 0.6;
     this.generation = 0;
   }
+  createContext() {
+    this.context = new AudioContext();
+    this.gain = this.context.createGain();
+    this.gain.gain.value = this.volume;
+    // Clips pass through the analyser before the volume control, so the
+    // visualiser moves the same at any volume.
+    this.analyser = this.context.createAnalyser();
+    this.analyser.fftSize = 512;
+    this.analyser.smoothingTimeConstant = 0.78;
+    this.analyser.connect(this.gain);
+    this.gain.connect(this.context.destination);
+  }
   async unlock() {
-    if (!this.context || this.context.state === "closed") {
-      this.context = new AudioContext();
-      this.gain = this.context.createGain();
-      this.gain.gain.value = this.volume;
-      this.gain.connect(this.context.destination);
-    }
+    if (!this.context || this.context.state === "closed") this.createContext();
     if (this.context.state !== "running") await this.context.resume();
   }
   async decode(bytes) {
     // Decoding does not start playback or require an autoplay exemption.
-    if (!this.context) {
-      this.context = new AudioContext();
-      this.gain = this.context.createGain();
-      this.gain.gain.value = this.volume;
-      this.gain.connect(this.context.destination);
-    }
+    if (!this.context) this.createContext();
     const buffer = await this.context.decodeAudioData(bytes.slice(0));
     audibleClipStart(buffer);
     return buffer;
@@ -80,7 +82,7 @@ export class ClipPlayer {
     source.buffer = this.buffer;
     const envelope = this.context.createGain();
     source.connect(envelope);
-    envelope.connect(this.gain);
+    envelope.connect(this.analyser);
     const at = Math.max(this.context.currentTime + 0.02, when ?? 0);
     const fade = Math.min(0.003, duration / 10);
     envelope.gain.setValueAtTime(0, at);

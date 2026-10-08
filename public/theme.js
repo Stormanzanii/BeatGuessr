@@ -54,7 +54,10 @@ export function setAmbientCover(url) {
 }
 
 // Playback progress as a 0-1 custom property, for themes that fill text
-// along with the clip.
-export function setProgress(progress) {
-  document.body.style.setProperty("--progress", String(progress));
+// along with the clip. Set only on the elements that read it: setting it on
+// <body> every frame restyled the whole page and made the glass panels
+// re-blur, which flickered.
+export function setProgress(progress, ...elements) {
+  for (const element of elements)
+    element?.style.setProperty("--progress", String(progress));
 }

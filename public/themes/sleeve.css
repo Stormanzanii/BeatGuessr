@@ -2418,3 +2418,68 @@ footer {
     display: inline;
   }
 }
+
+/* ---------------------------------------------------------------------------
+   Desktop layout: Back cover. The scoreboard and library sit down the left
+   like a tracklist on the back of a sleeve; the game takes the rest as one
+   wide column with the turntable at its centre.
+   --------------------------------------------------------------------------- */
+@media (min-width: 1000px) {
+  .topbar-inner {
+    max-width: none;
+    padding: 0 clamp(16px, 2vw, 40px);
+  }
+  .workspace {
+    max-width: none;
+    margin-top: clamp(14px, 1.6vw, 28px);
+    padding: 0 clamp(16px, 2vw, 40px);
+    gap: clamp(14px, 1.4vw, 24px);
+    grid-template-columns: clamp(300px, 23vw, 400px) minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-areas:
+      "score game"
+      "lib game";
+  }
+  .session {
+    grid-area: score;
+  }
+  .library {
+    grid-area: lib;
+  }
+  .game {
+    grid-area: game;
+    padding: clamp(24px, 2.4vw, 44px) clamp(28px, 4vw, 80px) 22px;
+  }
+  .game h1 {
+    font-size: clamp(52px, 5vw, 104px);
+  }
+  .game > .player,
+  .game > .clip-control,
+  .game > #guess-form,
+  .game > .message,
+  .game > .guess-history,
+  .game > .reveal {
+    width: 100%;
+    max-width: 760px;
+    margin-inline: auto;
+  }
+  .game > .game-bottom {
+    width: 100%;
+  }
+  .turntable {
+    --s: clamp(200px, 17vw, 320px);
+  }
+  .stats strong {
+    font-size: clamp(40px, 3vw, 60px);
+  }
+}
+@media (min-width: 1000px) and (min-height: 680px) {
+  .turntable {
+    --s: min(80cqh, 40cqw, 360px);
+  }
+}
+
+:root {
+  --viz-color: var(--accent);
+  --viz-glow: color-mix(in srgb, var(--accent) 40%, transparent);
+}
