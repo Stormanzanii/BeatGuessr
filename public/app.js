@@ -4,6 +4,7 @@ import { mergeSuggestions } from "./guess-search.js";
 import { songCandidates, nextPlaylist, SONG_ATTEMPTS } from "./song-selection.js";
 import { recordingKey } from "./recording.js";
 import { spotifyAppURL } from "./spotify-links.js";
+import { trackSuggestions } from "./suggestion-position.js";
 import {
   restoredPlaylists, rememberPlaylist, forgetPlaylist,
   savedAudio, rememberAudio, clearAudio, cacheErrorMessage,
@@ -15,6 +16,10 @@ import {
 } from "./guess-history.js";
 
 const $ = (id) => document.getElementById(id);
+const placeSuggestionList = trackSuggestions(
+  $("suggestions"),
+  $("guess").closest(".guess-wrapper"),
+);
 const year = new Date().getFullYear();
 const readStored = (key, fallback) => {
   try {
@@ -762,6 +767,7 @@ function suggestionStatus(text) {
   $("suggestions").replaceChildren(status);
   $("suggestions").hidden = false;
   $("guess").setAttribute("aria-expanded", "true");
+  placeSuggestionList();
 }
 function searchSuggestions() {
   clearSuggestions();
@@ -832,6 +838,7 @@ function renderSuggestions() {
     button.addEventListener("click", () => submitGuess(song.title, song));
     $("suggestions").append(button);
   });
+  placeSuggestionList();
 }
 $("guess").addEventListener("input", searchSuggestions);
 $("guess").addEventListener("keydown", (event) => {

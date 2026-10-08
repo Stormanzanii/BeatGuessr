@@ -3,8 +3,13 @@ import { celebrate, confettiMultiplier } from "./confetti.js";
 import { wasGuessedWrong, nextEnabledSuggestion } from "./guess-history.js";
 import { restoredPlaylists, rememberPlaylist, cacheErrorMessage } from "./library-cache.js";
 import { spotifyAppURL } from "./spotify-links.js";
+import { trackSuggestions } from "./suggestion-position.js";
 
 const $ = (id) => document.getElementById(id);
+const placeSuggestionList = trackSuggestions(
+  $("room-suggestions"),
+  $("room-guess"),
+);
 const stored = (key, fallback) => {
   try {
     return JSON.parse(localStorage.getItem(key)) ?? fallback;
@@ -614,6 +619,7 @@ function renderSuggestions() {
   });
   $("room-suggestions").hidden = !suggestions.length;
   $("room-guess").setAttribute("aria-expanded", String(!!suggestions.length));
+  placeSuggestionList();
 }
 $("room-guess").addEventListener("input", () => {
   clearSuggestions();

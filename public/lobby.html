@@ -3,14 +3,15 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#0a0c0e" />
+    <meta name="theme-color" content="#f2ede4" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#12110f" media="(prefers-color-scheme: dark)" />
     <title>Play with friends · BeatGuessr</title>
     <link rel="icon" href="/icon.svg" type="image/svg+xml" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
       rel="stylesheet"
-      href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&family=JetBrains+Mono:wght@400..700&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wdth,wght@75..100,400..700&family=Instrument+Serif:ital@0;1&display=swap"
     />
     <link rel="stylesheet" href="/style.css" />
     <link rel="stylesheet" href="/layout.css" />
@@ -20,18 +21,15 @@
   <body>
     <header class="topbar">
       <div class="topbar-inner">
-        <div class="topbar-left">
-          <a class="brand" href="/" aria-label="BeatGuessr home"
-            ><svg class="brand-mark" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2.5"/><circle cx="12" cy="12" r="3.5" fill="currentColor"/></svg
-            ><span>BeatGuessr</span></a
-          >
-          <span id="connection" class="slate connection" role="status"></span>
-        </div>
-        <nav class="nav-links" aria-label="Game mode">
-          <a class="slate" href="/">Solo</a
-          ><a class="slate" href="/lobby" aria-current="page">With friends</a>
+        <a class="brand" href="/" aria-label="BeatGuessr home"
+          ><span class="brand-disc" aria-hidden="true"></span
+          ><span class="brand-name">BeatGuessr</span></a
+        >
+        <nav class="mode-switch" aria-label="Game mode">
+          <a href="/">Solo</a
+          ><a href="/lobby" aria-current="page">With friends</a>
         </nav>
-        <span class="topbar-spacer" aria-hidden="true"></span>
+        <span id="connection" class="connection" role="status"></span>
       </div>
     </header>
     <main class="lobby-shell">
@@ -67,7 +65,7 @@
             </p>
             <div id="lobby-sources" class="lobby-sources"></div>
             <div class="lobby-import">
-              <label for="lobby-csv" class="button outlined">Import CSV</label
+              <label for="lobby-csv" class="button secondary">Import CSV</label
               ><input
                 id="lobby-csv"
                 type="file"
@@ -105,7 +103,7 @@
               <div class="eyebrow">Room <span id="code-label" class="room-code"></span></div>
               <h1 id="round-title" class="display">Ready when you are.</h1>
             </div>
-            <button id="copy-invite" class="button outlined">
+            <button id="copy-invite" class="button secondary">
               Copy invite
             </button>
           </div>
@@ -131,7 +129,7 @@
           <div id="clip-status" class="clip-status">
             Waiting for the first round
           </div>
-          <button id="enable-audio" class="button outlined" hidden>
+          <button id="enable-audio" class="button secondary" hidden>
             Enable audio
           </button>
           <div class="player-controls">
@@ -144,11 +142,11 @@
             Audio may take a moment to start after pressing Play clip.
           </p>
           <div id="host-controls" class="host-controls" hidden>
-            <button id="host-play" class="button outlined">
+            <button id="host-play" class="button secondary">
               Play for everyone</button
-            ><button id="host-stop" class="button outlined">
+            ><button id="host-stop" class="button secondary">
               Stop for everyone</button
-            ><button id="host-skip" class="button outlined">Longer clip</button
+            ><button id="host-skip" class="button secondary">Longer clip</button
             ><button id="host-reveal" class="text-button">Reveal answer</button
             ><button id="host-next" class="button primary">Start round</button>
           </div>
@@ -173,7 +171,7 @@
             ></div>
           </form>
           <p id="guess-feedback" role="status" aria-live="polite"></p>
-          <button id="vote-skip" class="button outlined">
+          <button id="vote-skip" class="button secondary">
             Vote for longer clip
           </button>
           <p
@@ -202,7 +200,7 @@
               value="60"
             />
           </div>
-          <button id="leave-room" class="button outlined">Leave room</button>
+          <button id="leave-room" class="button secondary">Leave room</button>
           <p class="muted small">
             Play Clip replays just for you. Everyone must vote to start a
             30-second countdown to the next clip. Keep guessing until it ends.

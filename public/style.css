@@ -1,51 +1,83 @@
 /* ---------------------------------------------------------------------------
-   Palette
+   BeatGuessr: a record sleeve, not a dashboard.
 
-   Broadcast monitor: near-black ink, off-white type, grey rules, and two
-   signal colours. Tally red means "audio is playing" (the ON AIR light, the
-   playhead, the current clip marker). Green only marks a correct guess.
-   Everything else is ink, paper and rule.
+   Paper and ink with one vermilion accent. The accent marks the thing to
+   press next (Play) and the record itself; green only ever means a correct
+   guess. Dark mode keeps the same roles on warm charcoal.
    --------------------------------------------------------------------------- */
 :root {
-  color-scheme: dark;
-  --background: #0a0c0e;
-  --foreground: #eceef0;
-  --display: #f4f5f6;
-  --panel: #101316;
-  --panel-2: #161a1e;
-  --rule: #22272c;
-  --rule-strong: #343b42;
-  --dim: #9aa3ab;
-  --faint: #5f6870;
-  --rec: #ff4136;
-  --saved: #3ddc84;
-  --mono: "JetBrains Mono", ui-monospace, monospace;
-  --sans: "Archivo", ui-sans-serif, system-ui, sans-serif;
+  color-scheme: light dark;
+  --bg: #f2ede4;
+  --sheet: #fbf8f2;
+  --field: #f4efe6;
+  --ink: #1c1a17;
+  --ink-2: #4a453d;
+  --muted: #7b7468;
+  --rule: #e4dccd;
+  --rule-strong: #cfc5b3;
+  --accent: #e0482a;
+  --accent-hover: #c93d22;
+  --on-accent: #fff8f0;
+  --accent-soft: #e0482a14;
+  --good: #2e7d4f;
+  --good-soft: #2e7d4f14;
+  --bad: #c23a22;
+  --inverse: #1c1a17;
+  --on-inverse: #fbf8f2;
+  --shadow: 0 1px 2px #2a1e1008, 0 10px 30px -12px #2a1e1022;
+  --shadow-pop: 0 18px 40px -12px #2a1e1033, 0 2px 6px #2a1e1010;
+  --serif: "Instrument Serif", Georgia, serif;
+  --sans: "Instrument Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --spring: cubic-bezier(0.34, 1.4, 0.64, 1);
   font-family: var(--sans);
   font-size: 15px;
-  font-feature-settings: "ss01", "tnum";
+  line-height: 1.5;
+  font-variant-numeric: tabular-nums;
   -webkit-font-smoothing: antialiased;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #12110f;
+    --sheet: #1a1815;
+    --field: #221f1b;
+    --ink: #f2ece1;
+    --ink-2: #cfc7b9;
+    --muted: #948b7d;
+    --rule: #2c2924;
+    --rule-strong: #3e3933;
+    --accent: #ff6a47;
+    --accent-hover: #ff8264;
+    --on-accent: #1a0d08;
+    --accent-soft: #ff6a471c;
+    --good: #62cf8e;
+    --good-soft: #62cf8e1a;
+    --bad: #ff7a5c;
+    --inverse: #f2ece1;
+    --on-inverse: #1a1815;
+    --shadow: 0 1px 0 #ffffff06 inset, 0 12px 32px -14px #000a;
+    --shadow-pop: 0 20px 44px -12px #000c, 0 0 0 1px #ffffff08;
+  }
 }
 * {
   box-sizing: border-box;
 }
 html,
 body {
-  background: var(--background);
+  background: var(--bg);
 }
 body {
   margin: 0;
   min-height: 100vh;
-  color: var(--foreground);
   display: flex;
   flex-direction: column;
+  color: var(--ink);
 }
 button,
 input,
 select {
   font: inherit;
   color: inherit;
-  border-radius: 3px;
 }
 button {
   cursor: pointer;
@@ -55,8 +87,8 @@ button:disabled {
   cursor: default;
 }
 :where(a, button, summary, input, select, label):focus-visible {
-  outline: 2px solid var(--foreground);
-  outline-offset: 3px;
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 a {
   color: inherit;
@@ -68,90 +100,80 @@ p {
 }
 h1,
 h2 {
-  font-weight: 700;
+  font-family: var(--serif);
+  font-weight: 400;
   letter-spacing: -0.01em;
-  color: var(--display);
+  line-height: 1.05;
 }
-p {
-  line-height: 1.6;
+h1 em,
+h2 em {
+  color: var(--accent);
 }
 [hidden] {
   display: none !important;
 }
-
-/* ---------------------------------------------------------------------------
-   Type: `.display` is the headline voice, `.slate` the small mono caps a
-   monitor prints over a feed. Labels, never sentences.
-   --------------------------------------------------------------------------- */
-.display {
-  font-family: var(--sans);
-  font-stretch: 62%;
-  font-weight: 800;
-  text-transform: uppercase;
-  line-height: 0.88;
-  letter-spacing: -0.005em;
-  color: var(--display);
+::selection {
+  background: var(--accent);
+  color: var(--on-accent);
 }
-.slate,
-.eyebrow,
-.field-label,
-.field > label,
-summary {
-  font-family: var(--mono);
-  font-size: 11px;
-  font-weight: 500;
+
+/* Small labels and helper copy */
+.label,
+.eyebrow {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--faint);
+  color: var(--muted);
 }
 .hint {
   font-size: 13px;
-  line-height: 1.55;
-  color: var(--faint);
+  line-height: 1.5;
+  color: var(--muted);
 }
 .hint a {
-  color: var(--dim);
+  color: var(--ink-2);
+  text-underline-offset: 3px;
 }
 .muted {
-  color: var(--dim);
   font-size: 14px;
   line-height: 1.6;
+  color: var(--muted);
 }
 .small {
   font-size: 13px;
 }
 kbd {
   display: inline-flex;
-  min-width: 1.9em;
   align-items: center;
   justify-content: center;
-  border-radius: 3px;
+  min-width: 24px;
+  height: 22px;
+  padding: 0 6px;
   border: 1px solid var(--rule-strong);
-  border-bottom-width: 3px;
-  background: var(--panel-2);
-  padding: 0.05em 0.5em;
-  font-family: var(--mono);
-  font-size: 11px;
-  font-weight: 600;
-  line-height: 1.5;
-  color: var(--foreground);
-  text-transform: none;
-  letter-spacing: 0;
+  border-bottom-width: 2px;
+  border-radius: 5px;
+  background: var(--sheet);
+  font: 600 11px/1 var(--sans);
+  color: var(--ink-2);
 }
 
 /* ---------------------------------------------------------------------------
-   Header: a plain bar across the full width, one rule underneath.
+   Header
    --------------------------------------------------------------------------- */
 .topbar {
   position: sticky;
   top: 0;
   z-index: 30;
-  background: var(--background);
+  background: color-mix(in srgb, var(--bg) 88%, transparent);
+  backdrop-filter: saturate(1.2) blur(10px);
+  -webkit-backdrop-filter: saturate(1.2) blur(10px);
   border-bottom: 1px solid var(--rule);
 }
 .topbar-inner {
-  max-width: 1280px;
-  height: 56px;
+  max-width: 1320px;
+  height: 64px;
   margin: 0 auto;
   padding: 0 24px;
   display: grid;
@@ -159,170 +181,172 @@ kbd {
   align-items: center;
   gap: 16px;
 }
-.topbar-left {
-  display: flex;
-  align-items: center;
-  gap: 20px;
-  min-width: 0;
-}
 .brand {
   display: inline-flex;
   align-items: center;
-  gap: 9px;
-  font-size: 17px;
-  font-weight: 700;
-  font-stretch: 87%;
-  letter-spacing: -0.01em;
+  gap: 10px;
+  justify-self: start;
+  font-family: var(--serif);
+  font-size: 26px;
+  line-height: 1;
   text-decoration: none;
-  color: var(--foreground);
 }
-.brand-mark {
-  width: 18px;
-  height: 18px;
-}
-.record.spinning,
-.brand-mark {
-  transform-origin: center;
-}
-body.is-playing .brand-mark {
-  animation: spin 1.8s linear infinite;
-}
-/* The ON AIR tally: dark while idle, a blinking red light while audio plays.
-   A tally light blinks; it does not fade. */
-.tally {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  color: var(--dim);
-}
-.tally i {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--rule-strong);
-}
-.tally-live {
-  display: none;
-}
-body.is-playing .tally i {
-  background: var(--rec);
-  animation: tally 1s steps(1) infinite;
-}
-body.is-playing .tally-live {
-  display: inline;
-  color: var(--foreground);
-}
-body.is-playing .tally-idle {
-  display: none;
-}
-.nav-links {
-  display: flex;
-  gap: 4px;
-}
-.nav-links a {
+.brand-disc {
   position: relative;
-  padding: 8px 12px;
-  text-decoration: none;
-  color: var(--dim);
-  transition: color 0.2s ease;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: repeating-radial-gradient(circle, #141210 0 1.5px, #2a2622 2px 2.5px);
 }
-.nav-links a:hover,
-.nav-links a[aria-current="page"] {
-  color: var(--foreground);
-}
-.nav-links a::after {
+.brand-disc::after {
   content: "";
   position: absolute;
-  left: 12px;
-  right: 12px;
-  bottom: -11px;
-  height: 2px;
-  background: var(--foreground);
-  transform: scaleX(0);
-  transition: transform 0.25s ease;
+  inset: 33%;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 1.5px #141210;
 }
-.nav-links a[aria-current="page"]::after {
-  transform: scaleX(1);
+body.is-playing .brand-disc {
+  animation: spin 1.6s linear infinite;
 }
-#help-button {
+/* Two-way switch; the highlight sits under whichever page is current. */
+.mode-switch {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  padding: 4px;
+  border: 1px solid var(--rule);
+  border-radius: 12px;
+  background: var(--sheet);
+}
+.mode-switch::before {
+  content: "";
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  left: 4px;
+  width: calc(50% - 4px);
+  border-radius: 8px;
+  background: var(--inverse);
+  transition: transform 0.35s var(--ease);
+}
+.mode-switch:has(a:last-child[aria-current])::before {
+  transform: translateX(100%);
+}
+.mode-switch a {
+  position: relative;
+  z-index: 1;
+  padding: 7px 18px;
+  text-align: center;
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+  color: var(--muted);
+  white-space: nowrap;
+  transition: color 0.25s ease;
+}
+.mode-switch a:hover {
+  color: var(--ink);
+}
+.mode-switch a[aria-current="page"] {
+  color: var(--on-inverse);
+}
+#help-button,
+.connection {
   justify-self: end;
 }
 
 /* ---------------------------------------------------------------------------
-   Buttons: square-cornered blocks with a mono label, like hardware keys.
+   Buttons
    --------------------------------------------------------------------------- */
 .button {
   display: inline-flex;
-  height: 42px;
   align-items: center;
   justify-content: center;
-  gap: 10px;
-  border-radius: 3px;
+  gap: 8px;
+  height: 42px;
+  padding: 0 16px;
   border: 1px solid transparent;
-  padding: 0 18px;
-  font-family: var(--mono);
-  font-size: 12px;
+  border-radius: 10px;
+  font-size: 14px;
   font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
   white-space: nowrap;
   text-decoration: none;
   cursor: pointer;
   transition:
-    background-color 0.15s ease,
-    border-color 0.15s ease,
-    color 0.15s ease;
+    background-color 0.2s ease,
+    border-color 0.2s ease,
+    color 0.2s ease,
+    transform 0.15s ease;
 }
-.small-button {
-  height: 34px;
-  padding: 0 12px;
-  font-size: 11px;
+.button:not(:disabled):active,
+.play-button:not(:disabled):active,
+.text-button:not(:disabled):active {
+  transform: scale(0.97);
+}
+.button svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  flex-shrink: 0;
 }
 .primary {
-  background: var(--foreground);
-  color: var(--background);
+  background: var(--inverse);
+  color: var(--on-inverse);
 }
 .primary:hover:not(:disabled) {
-  background: #fff;
+  background: color-mix(in srgb, var(--inverse) 86%, var(--accent));
 }
+.secondary,
 .outlined {
-  background: transparent;
+  background: var(--sheet);
   border-color: var(--rule-strong);
-  color: var(--foreground);
+  color: var(--ink);
 }
+.secondary:hover:not(:disabled),
 .outlined:hover:not(:disabled) {
-  border-color: var(--faint);
-  background: var(--panel-2);
+  border-color: var(--ink-2);
+}
+.ghost {
+  background: transparent;
+  color: var(--ink-2);
+}
+.ghost:hover {
+  background: var(--sheet);
+  color: var(--ink);
 }
 .wide {
   width: 100%;
 }
 .text-button {
+  padding: 4px 0;
   border: 0;
   background: transparent;
-  padding: 4px 0;
-  font-family: var(--mono);
-  font-size: 11px;
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--dim);
-  transition: color 0.15s ease;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--muted);
+  transition:
+    color 0.2s ease,
+    transform 0.15s ease;
 }
 .text-button:hover:not(:disabled) {
-  color: var(--foreground);
+  color: var(--ink);
 }
 .danger {
-  color: var(--rec);
+  color: var(--bad);
 }
 
 /* ---------------------------------------------------------------------------
-   Form controls
+   Fields
    --------------------------------------------------------------------------- */
-.field-label,
-.field > label {
-  display: block;
-  margin: 24px 0 8px;
+.label + select,
+.label + input,
+.label + .source-picker {
+  margin-top: 8px;
 }
 select,
 input[type="number"],
@@ -330,85 +354,124 @@ input[type="text"] {
   width: 100%;
   height: 42px;
   padding: 0 12px;
-  font-size: 14px;
-  background: var(--background);
   border: 1px solid var(--rule-strong);
-  transition: border-color 0.15s ease;
+  border-radius: 10px;
+  background: var(--field);
+  font-size: 14px;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
 }
 select {
   appearance: none;
-  padding-right: 32px;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' fill='none' stroke='%239aa3ab' stroke-width='1.6'%3E%3Cpath d='M1 3.5 5 7.5 9 3.5'/%3E%3C/svg%3E");
+  padding-right: 34px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' fill='none' stroke='%237b7468' stroke-width='1.6' stroke-linecap='round'%3E%3Cpath d='M1.5 3.5 5 7l3.5-3.5'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
-  background-position: right 12px center;
+  background-position: right 13px center;
   cursor: pointer;
 }
 select:hover,
 input[type="number"]:hover,
 input[type="text"]:hover {
-  border-color: var(--faint);
+  border-color: var(--ink-2);
 }
 select:focus,
 input[type="number"]:focus,
 input[type="text"]:focus {
   outline: none;
-  border-color: var(--foreground);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
 }
 input[type="checkbox"] {
-  width: 16px;
-  height: 16px;
-  margin: 0;
-  accent-color: var(--foreground);
-  flex-shrink: 0;
-  cursor: pointer;
+  accent-color: var(--accent);
 }
 input[type="range"] {
   appearance: none;
   width: 100%;
-  height: 20px;
+  height: 22px;
   margin: 0;
   background: transparent;
   cursor: pointer;
 }
 input[type="range"]::-webkit-slider-runnable-track {
-  height: 2px;
+  height: 4px;
+  border-radius: 4px;
   background: var(--rule-strong);
 }
 input[type="range"]::-moz-range-track {
-  height: 2px;
+  height: 4px;
+  border-radius: 4px;
   background: var(--rule-strong);
 }
 input[type="range"]::-moz-range-progress {
-  height: 2px;
-  background: var(--foreground);
+  height: 4px;
+  border-radius: 4px;
+  background: var(--ink);
 }
 input[type="range"]::-webkit-slider-thumb {
   appearance: none;
-  width: 10px;
+  width: 18px;
   height: 18px;
-  margin-top: -8px;
-  border-radius: 2px;
-  background: var(--foreground);
+  margin-top: -7px;
+  border-radius: 50%;
+  background: var(--sheet);
+  border: 2px solid var(--ink);
+  transition: transform 0.2s var(--spring);
 }
 input[type="range"]::-moz-range-thumb {
-  width: 10px;
-  height: 18px;
-  border: 0;
-  border-radius: 2px;
-  background: var(--foreground);
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--sheet);
+  border: 2px solid var(--ink);
 }
+input[type="range"]:active::-webkit-slider-thumb {
+  transform: scale(1.15);
+}
+/* Checkboxes inside a toggle row render as switches. */
 .toggle-row {
   display: flex;
   align-items: center;
-  gap: 10px;
-  margin-top: 16px;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 14px;
   font-size: 14px;
-  color: var(--foreground);
   cursor: pointer;
+}
+.toggle-row input[type="checkbox"] {
+  appearance: none;
+  position: relative;
+  flex-shrink: 0;
+  width: 38px;
+  height: 22px;
+  margin: 0;
+  border-radius: 11px;
+  background: var(--rule-strong);
+  cursor: pointer;
+  transition: background-color 0.25s ease;
+}
+.toggle-row input[type="checkbox"]::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--sheet);
+  box-shadow: 0 1px 2px #0003;
+  transition: transform 0.3s var(--spring);
+}
+.toggle-row input[type="checkbox"]:checked {
+  background: var(--ink);
+}
+.toggle-row input[type="checkbox"]:checked::after {
+  transform: translateX(16px);
 }
 
 /* ---------------------------------------------------------------------------
-   Disclosures: native <details>, animated where the browser can size to auto.
+   Disclosures: native <details>, opened with a height transition where the
+   browser supports animating to auto.
    --------------------------------------------------------------------------- */
 details {
   border-top: 1px solid var(--rule);
@@ -417,29 +480,36 @@ summary {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 16px 0;
-  cursor: pointer;
+  gap: 10px;
+  padding: 14px 0;
+  font-size: 14px;
+  font-weight: 600;
   list-style: none;
-  color: var(--dim);
-  transition: color 0.15s ease;
+  cursor: pointer;
+  user-select: none;
+  transition: color 0.2s ease;
 }
 summary::-webkit-details-marker {
   display: none;
 }
 summary::after {
-  content: "+";
-  font-size: 15px;
-  line-height: 1;
+  content: "";
+  width: 7px;
+  height: 7px;
+  margin-right: 3px;
+  border-right: 1.6px solid var(--muted);
+  border-bottom: 1.6px solid var(--muted);
+  transform: translateY(-2px) rotate(45deg);
+  transition: transform 0.3s var(--ease);
 }
 details[open] > summary::after {
-  content: "−";
+  transform: translateY(1px) rotate(-135deg);
 }
-summary:hover,
-details[open] > summary {
-  color: var(--foreground);
+summary:hover {
+  color: var(--accent);
 }
 details > :last-child {
-  padding-bottom: 16px;
+  padding-bottom: 14px;
 }
 @supports (interpolate-size: allow-keywords) {
   details {
@@ -449,8 +519,8 @@ details > :last-child {
     block-size: 0;
     overflow-y: clip;
     transition:
-      block-size 0.25s ease,
-      content-visibility 0.25s allow-discrete;
+      block-size 0.3s var(--ease),
+      content-visibility 0.3s allow-discrete;
   }
   details[open]::details-content {
     block-size: auto;
@@ -458,47 +528,53 @@ details > :last-child {
 }
 
 /* ---------------------------------------------------------------------------
-   Messages and lists
+   Status text and suggestion lists
    --------------------------------------------------------------------------- */
 .message {
-  min-height: 26px;
+  min-height: 28px;
   padding-top: 10px;
   font-size: 14px;
-  line-height: 1.5;
-  color: var(--dim);
+  color: var(--muted);
 }
 .message.error {
-  color: var(--rec);
+  color: var(--bad);
 }
 .message.success {
-  color: var(--saved);
+  color: var(--good);
+  font-weight: 600;
 }
 .suggestions {
   position: absolute;
   z-index: 25;
   left: 0;
   right: 0;
-  top: calc(100% + 4px);
-  padding: 4px 0;
-  border: 1px solid var(--rule-strong);
-  border-radius: 3px;
-  background: var(--panel-2);
-  box-shadow: 0 16px 32px #0009;
-  max-height: min(360px, 45vh);
+  top: calc(100% + 6px);
+  padding: 6px;
+  border: 1px solid var(--rule);
+  border-radius: 12px;
+  background: var(--sheet);
+  box-shadow: var(--shadow-pop);
+  max-height: 360px;
   overflow-y: auto;
   overscroll-behavior: contain;
-  animation: drop 0.15s ease both;
+  transform-origin: top center;
+  animation: pop 0.18s var(--ease) both;
+}
+/* Flipped above the field when there is no room below it. */
+.suggestions.above {
+  top: auto;
+  bottom: calc(100% + 6px);
+  transform-origin: bottom center;
 }
 .suggestions button {
-  position: relative;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 14px;
   width: 100%;
-  padding: 10px 14px;
+  padding: 10px 12px;
   border: 0;
-  border-radius: 0;
+  border-radius: 8px;
   background: none;
   text-align: left;
   font-size: 14px;
@@ -506,9 +582,14 @@ details > :last-child {
 .suggestions button strong {
   font-weight: 600;
 }
-.suggestions button span {
+.suggestions button > span:last-child {
+  flex-shrink: 0;
+  max-width: 45%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-size: 13px;
-  color: var(--dim);
+  color: var(--muted);
 }
 .suggestions .suggestion-title {
   display: flex;
@@ -516,151 +597,126 @@ details > :last-child {
   align-items: flex-start;
   gap: 2px;
   min-width: 0;
+  max-width: none;
   color: inherit;
   font-size: inherit;
 }
 .suggestions button:hover,
 .suggestions button[aria-selected="true"] {
-  background: var(--rule);
+  background: var(--field);
 }
-.suggestions button[aria-selected="true"]::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  width: 2px;
-  background: var(--foreground);
+.suggestions button[aria-selected="true"] strong {
+  color: var(--accent);
 }
 .suggestions button.guessed-wrong,
 .suggestions button.guessed-wrong:hover {
   background: transparent;
-  color: var(--faint);
+  color: var(--muted);
   cursor: not-allowed;
+  opacity: 0.7;
 }
 .suggestions button.guessed-wrong strong {
   text-decoration: line-through;
 }
 .suggestions .guess-status {
-  font-family: var(--mono);
-  font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--faint);
+  font-size: 12px;
+  color: var(--bad);
 }
 .suggestion-status {
-  padding: 12px 14px;
+  padding: 12px;
   font-size: 13px;
-  color: var(--dim);
+  color: var(--muted);
 }
 
-/* Playback progress: a ruler with a red playhead riding the fill. */
+/* Playback progress */
 .audio-progress {
-  position: relative;
-  height: 14px;
-  background:
-    repeating-linear-gradient(
-        to right,
-        var(--rule-strong) 0 1px,
-        transparent 1px 25%
-      )
-      bottom / 100% 10px no-repeat,
-    repeating-linear-gradient(to right, var(--rule) 0 1px, transparent 1px 2.5%)
-      bottom / 100% 5px no-repeat;
-  border-bottom: 1px solid var(--rule-strong);
+  height: 4px;
+  border-radius: 4px;
+  background: var(--rule);
+  overflow: hidden;
 }
 .audio-progress > div {
-  position: relative;
-  height: 100%;
   width: 0;
-  background: #eceef014;
-}
-.audio-progress > div::after {
-  content: "";
-  position: absolute;
-  right: -1px;
-  top: -3px;
-  bottom: -1px;
-  width: 2px;
-  background: var(--rec);
-  opacity: 0;
-}
-body.is-playing .audio-progress > div::after {
-  opacity: 1;
+  height: 100%;
+  border-radius: 4px;
+  background: var(--accent);
 }
 
 /* ---------------------------------------------------------------------------
    Dialogs
    --------------------------------------------------------------------------- */
 dialog {
-  width: 540px;
+  width: 520px;
   max-width: calc(100vw - 32px);
   max-height: calc(100vh - 40px);
   overflow: auto;
   padding: 28px;
-  background: var(--panel);
-  border: 1px solid var(--rule-strong);
-  border-radius: 3px;
-  color: var(--foreground);
+  border: 1px solid var(--rule);
+  border-radius: 18px;
+  background: var(--sheet);
+  color: var(--ink);
+  box-shadow: var(--shadow-pop);
 }
 dialog[open] {
-  animation: rise 0.3s ease both;
+  animation: dialog-in 0.32s var(--spring) both;
 }
 dialog::backdrop {
-  background: #000c;
+  background: #1c1a1766;
+  animation: fade 0.25s ease both;
 }
 .dialog-heading {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: 20px;
-  margin-bottom: 18px;
+  margin-bottom: 14px;
 }
 .dialog-heading h2 {
-  font-size: 44px;
+  font-size: 34px;
 }
 .icon-button {
   display: grid;
   place-items: center;
   width: 34px;
   height: 34px;
-  border: 1px solid var(--rule-strong);
+  border: 1px solid var(--rule);
+  border-radius: 50%;
   background: transparent;
-  font-size: 18px;
+  font-size: 20px;
   line-height: 1;
-  color: var(--dim);
+  color: var(--muted);
   transition:
-    color 0.15s ease,
-    border-color 0.15s ease;
+    color 0.2s ease,
+    transform 0.3s var(--ease);
 }
 .icon-button:hover {
-  color: var(--foreground);
-  border-color: var(--faint);
+  color: var(--ink);
+  transform: rotate(90deg);
+}
+#playlist-form .label {
+  margin-top: 6px;
 }
 #playlist-form .primary {
-  margin-top: 14px;
+  margin-top: 12px;
 }
 .or-divider {
   display: flex;
   align-items: center;
   gap: 12px;
-  margin: 24px 0;
-  font-family: var(--mono);
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--faint);
+  margin: 22px 0;
+  font-size: 13px;
+  color: var(--muted);
 }
 .or-divider::before,
 .or-divider::after {
   content: "";
-  height: 1px;
   flex: 1;
+  height: 1px;
   background: var(--rule);
 }
 #import-dialog .small,
 #help-dialog .small {
-  margin-top: 14px;
+  margin-top: 12px;
 }
 #import-dialog label[for="csv-file"] {
   cursor: pointer;
@@ -668,26 +724,34 @@ dialog::backdrop {
 .how-to {
   list-style: none;
   counter-reset: step;
-  margin: 0 0 20px;
+  margin: 4px 0 18px;
   padding: 0;
-  border-top: 1px solid var(--rule);
 }
 .how-to li {
   counter-increment: step;
   display: grid;
-  grid-template-columns: 40px 1fr;
-  padding: 14px 0;
+  grid-template-columns: 36px 1fr;
+  padding: 12px 0;
   border-bottom: 1px solid var(--rule);
   font-size: 15px;
   line-height: 1.55;
-  color: var(--dim);
+  animation: rise 0.4s var(--ease) both;
+}
+.how-to li:nth-child(2) {
+  animation-delay: 0.05s;
+}
+.how-to li:nth-child(3) {
+  animation-delay: 0.1s;
+}
+.how-to li:nth-child(4) {
+  animation-delay: 0.15s;
 }
 .how-to li::before {
-  content: "0" counter(step);
-  padding-top: 3px;
-  font-family: var(--mono);
-  font-size: 11px;
-  color: var(--faint);
+  content: counter(step);
+  font-family: var(--serif);
+  font-size: 26px;
+  line-height: 1;
+  color: var(--accent);
 }
 
 .confetti {
@@ -700,14 +764,8 @@ dialog::backdrop {
 }
 
 /* ---------------------------------------------------------------------------
-   Motion. Each thing that moves reports state: the tally while audio plays,
-   the record turning, the playhead, a panel coming in once on load.
+   Motion
    --------------------------------------------------------------------------- */
-@keyframes tally {
-  50% {
-    opacity: 0.2;
-  }
-}
 @keyframes spin {
   to {
     transform: rotate(360deg);
@@ -718,65 +776,71 @@ dialog::backdrop {
     transform: rotate(360deg);
   }
 }
+@keyframes fade {
+  from {
+    opacity: 0;
+  }
+}
 @keyframes rise {
   from {
     opacity: 0;
-    transform: translate3d(0, 12px, 0);
+    transform: translateY(10px);
   }
 }
-@keyframes drop {
+@keyframes pop {
   from {
     opacity: 0;
-    transform: translate3d(0, -4px, 0);
+    transform: scale(0.97);
+  }
+}
+@keyframes dialog-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.97);
   }
 }
 @keyframes shake {
   20%,
   60% {
-    transform: translateX(-4px);
+    transform: translateX(-5px);
   }
   40%,
   80% {
-    transform: translateX(4px);
+    transform: translateX(5px);
   }
 }
 
-@media (max-width: 760px) {
+@media (max-width: 720px) {
   .topbar-inner {
     grid-template-columns: auto 1fr auto;
-    padding: 0 16px;
+    height: 58px;
+    padding: 0 14px;
     gap: 10px;
   }
-  .tally {
+  .brand-name {
     display: none;
   }
-  .nav-links {
-    justify-content: center;
+  .mode-switch {
+    justify-self: center;
   }
-  .nav-links a {
-    padding: 8px 6px;
+  .mode-switch a {
+    padding: 6px 12px;
+    font-size: 13px;
   }
-  .nav-links a::after {
-    left: 6px;
-    right: 6px;
+  #help-button {
+    padding: 0 10px;
+    font-size: 13px;
   }
   dialog {
     padding: 22px;
-  }
-  .dialog-heading h2 {
-    font-size: 36px;
-  }
-}
-@media (max-width: 420px) {
-  .brand span {
-    display: none;
   }
 }
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
   *::after {
-    animation: none !important;
-    transition: none !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 }
