@@ -1003,17 +1003,22 @@ $("local-files").addEventListener("change", async () => {
     state.local.push(track);
     added.push(track);
   }
+  state.selectedSources = [...new Set([
+    ...state.selectedSources.filter((id) => id !== "curated"), "local",
+  ])];
+  saveSettings();
+  setLoading(true);
   try {
     await rememberAudio(added);
     cacheStatus();
   } catch (error) { cacheStatus(cacheErrorMessage(error)); }
-  await refreshSources([
-    ...new Set([
-      ...state.selectedSources.filter((id) => id !== "curated"),
-      "local",
-    ]),
-  ]);
-  await changeSource();
+  try {
+    await refreshSources(state.selectedSources);
+    await changeSource();
+  } catch (error) {
+    setLoading(false);
+    message(error.message, "error");
+  }
   $("local-files").value = "";
 });
 document.addEventListener("keydown", (event) => {

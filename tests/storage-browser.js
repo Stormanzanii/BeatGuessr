@@ -91,7 +91,24 @@ try {
   await ready(page);
   await importCSV(page);
   const originalId = await page.evaluate(() => beatguessr.state.playlists[0].id);
+  let releaseSources, sourcesStarted, sourcesFinished;
+  const blockedSources = new Promise((done) => { releaseSources = done; });
+  const sourcesRequest = new Promise((done) => { sourcesStarted = done; });
+  const continuedSources = new Promise((done) => { sourcesFinished = done; });
+  await page.route("**/api/playlists", async (route) => {
+    sourcesStarted();
+    await blockedSources;
+    await route.continue();
+    sourcesFinished();
+  });
   await page.locator("#local-files").setInputFiles(audioPath);
+  await sourcesRequest;
+  try {
+    assert.ok(await page.evaluate(() => JSON.parse(localStorage.getItem("beatguessr:settings")).sources.includes("local")),
+      "The local source selection must be saved before a slow library response");
+  } finally { releaseSources(); }
+  await continuedSources;
+  await page.unroute("**/api/playlists");
   await page.waitForFunction(() => beatguessr.state.local.length === 1 && !beatguessr.state.loading);
   await page.locator("#local-files").setInputFiles(audioPath);
   await ready(page);
