@@ -9,10 +9,14 @@ const HEIGHT = 68;
 const FRAME_MS = 1000 / 30;
 const FADE_MS = 1200;
 const FALLBACK = [
-  [0.28, 0.32, "#ff4d6d"],
-  [0.72, 0.64, "#7b5cff"],
-  [0.6, 0.2, "#ffb347"],
+  [0.22, 0.3, "#ff3d68"],
+  [0.78, 0.7, "#7b4dff"],
+  [0.62, 0.18, "#ff9d3d"],
+  [0.3, 0.85, "#c13bff"],
 ];
+// Matches the old CSS backdrop's saturate(2.2) brightness(0.62), lifted a
+// little because the canvas blur averages colours down more.
+const FILTER = "blur(5px) saturate(2.4) brightness(0.78)";
 
 class Ambient {
   constructor(canvas) {
@@ -89,17 +93,18 @@ class Ambient {
   // Spicy Lyrics layers its background.
   paintArt(image, time, alpha) {
     const ctx = this.context;
-    const size = Math.max(WIDTH, HEIGHT) * 1.9;
+    // Big enough that each turning copy sweeps colour across the screen.
+    const size = WIDTH * 2.6;
     const layers = [
-      [0.62, 0.38, 1, 0.9],
-      [0.32, 0.7, -0.8, 1],
-      [0.8, 0.82, -0.55, 0.85],
+      [0.68, 0.3, 1, 0.9],
+      [0.28, 0.72, -0.8, 1],
+      [0.9, 0.95, -0.55, 0.8],
     ];
     for (const [x, y, speed, opacity] of layers) {
       ctx.save();
       ctx.globalAlpha = alpha * opacity;
       ctx.translate(x * WIDTH, y * HEIGHT);
-      ctx.rotate(this.still ? 0 : (time / 48000) * Math.PI * 2 * speed);
+      ctx.rotate(this.still ? 0 : (time / 32000) * Math.PI * 2 * speed);
       ctx.drawImage(image, -size / 2, -size / 2, size, size);
       ctx.restore();
     }
@@ -108,15 +113,15 @@ class Ambient {
   paintFallback(time, alpha) {
     const ctx = this.context;
     ctx.globalAlpha = alpha;
-    ctx.fillStyle = "#1d1430";
+    ctx.fillStyle = "#3a1f63";
     ctx.fillRect(0, 0, WIDTH, HEIGHT);
     for (const [i, [x, y, colour]] of FALLBACK.entries()) {
-      const drift = this.still ? 0 : Math.sin(time / 9000 + i * 2) * 0.08;
+      const drift = this.still ? 0 : Math.sin(time / 7000 + i * 2) * 0.14;
       const cx = (x + drift) * WIDTH;
-      const cy = (y - drift) * HEIGHT;
-      const glow = ctx.createRadialGradient(cx, cy, 0, cx, cy, WIDTH * 0.5);
+      const cy = (y - drift * 0.8) * HEIGHT;
+      const glow = ctx.createRadialGradient(cx, cy, 0, cx, cy, WIDTH * 0.75);
       glow.addColorStop(0, colour);
-      glow.addColorStop(1, "transparent");
+      glow.addColorStop(1, `${colour}00`);
       ctx.fillStyle = glow;
       ctx.fillRect(0, 0, WIDTH, HEIGHT);
     }
@@ -125,7 +130,7 @@ class Ambient {
 
   draw(time) {
     const ctx = this.context;
-    ctx.filter = "blur(5px) saturate(2.2) brightness(0.62)";
+    ctx.filter = FILTER;
     ctx.clearRect(0, 0, WIDTH, HEIGHT);
     const fade = Math.min(1, (time - this.fadeStart) / FADE_MS);
     if (this.previous && fade < 1) this.paintArt(this.previous, time, 1);
